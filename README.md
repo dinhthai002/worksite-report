@@ -66,6 +66,7 @@ src/
 | What do the terms mean? | [Glossary](docs/glossary.md) |
 | How is it built? | [Architecture](docs/engineering/architecture.md), [Coding standard](docs/engineering/coding-standard.md), [Testing](docs/engineering/testing.md) |
 | How is work done? | [Workflow](docs/engineering/workflow.md) |
+| In what order is it built? | [Implementation plan](docs/engineering/implementation-plan.md) |
 | Why this way? | [ADRs](docs/adr/) |
 
 ## Simplifications

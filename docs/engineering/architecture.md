@@ -83,7 +83,8 @@ worksite-report/
 ├── docs/
 │   ├── glossary.md
 │   ├── product/            prd.md, use-cases.md
-│   ├── engineering/        architecture.md, coding-standard.md, testing.md, workflow.md
+│   ├── engineering/        architecture.md, coding-standard.md, testing.md, workflow.md,
+│   │                       implementation-plan.md
 │   └── adr/
 │
 ├── specs/                  one folder per feature, produced by Spec-Kit (workflow.md)
