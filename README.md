@@ -31,6 +31,8 @@ npx prisma migrate dev
 npm run dev
 ```
 
+If another PostgreSQL already uses port 5432, set `DB_PORT` in `.env` (for example `55432`) and use the same port in `DATABASE_URL`.
+
 | Script | What it does |
 | --- | --- |
 | `npm run dev` | Start the API with reload |

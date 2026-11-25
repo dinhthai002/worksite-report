@@ -17,8 +17,10 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: site_daily_report
+    # Host port for local tools (prisma migrate dev, psql). Set DB_PORT in .env when 5432 is taken.
+    # The api and migrate services always reach the database inside the network at db:5432.
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
