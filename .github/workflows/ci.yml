@@ -47,4 +47,4 @@ jobs:
         run: npx jest --selectProjects integration api --runInBand
 
       - name: Docker build
-        run: docker build --tag site-daily-report:ci .
+        run: docker build --tag worksite-report:ci .

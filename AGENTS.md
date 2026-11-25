@@ -4,7 +4,7 @@ Instructions for AI coding agents working in this repository.
 
 ## Project
 
-Site Daily Report: a TypeScript backend (Express 5, Prisma, PostgreSQL) where foremen report task progress and a site supervisor approves it. A modular monolith with two modules, `worksite` and `reporting`, in four DDD layers.
+Worksite Report: a TypeScript backend (Express 5, Prisma, PostgreSQL) where foremen report task progress and a site supervisor approves it. A modular monolith with two modules, `worksite` and `reporting`, in four DDD layers.
 
 ## Read before you work
 

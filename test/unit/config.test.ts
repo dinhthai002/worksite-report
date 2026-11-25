@@ -1,6 +1,6 @@
 import { ConfigError, loadConfig } from "@src/config";
 
-const DATABASE_URL = "postgresql://user:secret@localhost:5432/site_daily_report";
+const DATABASE_URL = "postgresql://user:secret@localhost:5432/worksite_report";
 
 describe("loadConfig", () => {
   it("applies the documented defaults when only DATABASE_URL is set", () => {

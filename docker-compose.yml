@@ -1,10 +1,10 @@
 # Runs the whole application: `docker compose up --build` (architecture.md section 9).
 # The credentials below are local development defaults, not secrets (CFG-02).
 
-name: site-daily-report
+name: worksite-report
 
 x-app-environment: &app-environment
-  DATABASE_URL: postgresql://postgres:postgres@db:5432/site_daily_report
+  DATABASE_URL: postgresql://postgres:postgres@db:5432/worksite_report
   PORT: "3000"
   BACKDATE_LIMIT_DAYS: "5"
   APP_TIME_ZONE: Asia/Ho_Chi_Minh
@@ -16,7 +16,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: site_daily_report
+      POSTGRES_DB: worksite_report
     # Host port for local tools (prisma migrate dev, psql). Set DB_PORT in .env when 5432 is taken.
     # The api and migrate services always reach the database inside the network at db:5432.
     ports:
@@ -24,7 +24,7 @@ services:
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d site_daily_report"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d worksite_report"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -32,7 +32,7 @@ services:
   # Applies migrations once, then exits. The seed step is added together with the first models.
   migrate:
     build: .
-    image: site-daily-report:local
+    image: worksite-report:local
     command: ["node_modules/.bin/prisma", "migrate", "deploy"]
     environment: *app-environment
     depends_on:
@@ -41,7 +41,7 @@ services:
     restart: "no"
 
   api:
-    image: site-daily-report:local
+    image: worksite-report:local
     environment: *app-environment
     ports:
       - "3000:3000"

@@ -1,5 +1,5 @@
 {
-  "name": "site-daily-report",
+  "name": "worksite-report",
   "version": "0.1.0",
   "private": true,
   "description": "Backend for tracking construction progress through daily reports",

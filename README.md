@@ -1,4 +1,4 @@
-# Site Daily Report
+# Worksite Report
 
 A backend for tracking construction progress through daily reports. Foremen report progress on the tasks assigned to them. The site supervisor reviews each report, and task progress changes only when a report is approved.
 

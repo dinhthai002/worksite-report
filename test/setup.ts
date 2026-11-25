@@ -18,7 +18,7 @@ async function globalSetup(): Promise<void> {
     return;
   }
 
-  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase("site_daily_report_test").start();
+  const container = await new PostgreSqlContainer(POSTGRES_IMAGE).withDatabase("worksite_report_test").start();
   const databaseUrl = container.getConnectionUri();
 
   execFileSync(process.execPath, [PRISMA_CLI, "migrate", "deploy"], {

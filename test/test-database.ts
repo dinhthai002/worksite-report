@@ -11,12 +11,12 @@ export interface TestDatabase {
 
 export const POSTGRES_IMAGE = "postgres:17.11";
 
-const state = globalThis as typeof globalThis & { siteDailyReportTestDatabase?: TestDatabase };
+const state = globalThis as typeof globalThis & { worksiteReportTestDatabase?: TestDatabase };
 
 export function currentTestDatabase(): TestDatabase | undefined {
-  return state.siteDailyReportTestDatabase;
+  return state.worksiteReportTestDatabase;
 }
 
 export function setTestDatabase(database: TestDatabase | undefined): void {
-  state.siteDailyReportTestDatabase = database;
+  state.worksiteReportTestDatabase = database;
 }

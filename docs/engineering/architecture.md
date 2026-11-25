@@ -1,6 +1,6 @@
 # Architecture
 
-- Scope: how the Site Daily Report backend is organized, built, and run.
+- Scope: how the Worksite Report backend is organized, built, and run.
 - Related documents: [PRD](../product/prd.md), [Use cases and business rules](../product/use-cases.md), [Glossary](../glossary.md), [Coding standard](./coding-standard.md), [Testing](./testing.md), [Workflow](./workflow.md), [ADRs](../adr/).
 - Code samples in this document illustrate the design. The source of truth is the code in `src/`.
 
@@ -58,7 +58,7 @@ Checked by `dependency-cruiser` in CI.
 ## 3. Directory structure
 
 ```
-site-daily-report/
+worksite-report/
 ├── README.md
 ├── AGENTS.md
 ├── CLAUDE.md               imports AGENTS.md
