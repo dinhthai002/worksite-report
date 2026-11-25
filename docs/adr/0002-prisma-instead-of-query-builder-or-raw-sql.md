@@ -5,7 +5,7 @@
 
 ## Context
 
-The data model is small: seven tables (architecture.md section 6.1). The hard parts are not complex queries but correctness under concurrency: unique constraints (BR-1, BR-4, BR-14), conditional updates on `version` (BR-15), and one transaction across reports and tasks (BR-9). Schema changes must be versioned and reviewable, and the team should get type-safe queries without writing types by hand.
+The data model is small: about seven tables, one per concept in the PRD model plus report history and request keys. The hard parts are not complex queries but correctness under concurrency: unique constraints (BR-1, BR-4, BR-14), conditional updates on `version` (BR-15), and one transaction across reports and tasks (BR-9). Schema changes must be versioned and reviewable, and the team should get type-safe queries without writing types by hand.
 
 ## Decision
 

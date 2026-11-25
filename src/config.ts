@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Typed, read-only configuration (architecture.md section 8). This is the only file that reads process.env (CFG-01).
+ * Typed, read-only configuration (architecture.md section 7). This is the only file that reads process.env (CFG-01).
  * Read once at startup; main.ts exits if a value is missing or invalid.
  */
 

@@ -1,4 +1,4 @@
-# CI (architecture.md section 10): one workflow on every push and pull request. All steps must pass.
+# CI (architecture.md section 9): one workflow on every push and pull request. All steps must pass.
 name: ci
 
 on:

@@ -1,4 +1,4 @@
-# Runs the whole application: `docker compose up --build` (architecture.md section 9).
+# Runs the whole application: `docker compose up --build` (architecture.md section 8).
 # The credentials below are local development defaults, not secrets (CFG-02).
 
 name: worksite-report

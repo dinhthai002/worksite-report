@@ -107,4 +107,4 @@ Each rule has a code for citing in reviews. The **Check** column names what enfo
 
 ## 10. Mandatory checks
 
-`npm run check` runs typecheck, Biome, dependency-cruiser, and unit tests. CI runs the same steps plus integration tests, API tests, and the Docker build. See the architecture document, section 10.
+`npm run check` runs typecheck, Biome, dependency-cruiser, and unit tests. CI runs the same steps plus integration tests, API tests, and the Docker build. See the architecture document, section 9.

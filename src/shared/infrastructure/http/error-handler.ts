@@ -4,7 +4,7 @@ import { DomainError, type DomainErrorKind, type ErrorDetails, NotFoundError } f
 import type { Logger } from "../logger";
 import { UnauthenticatedError } from "./actor.middleware";
 
-/** The one error shape every response uses (architecture.md section 5.3, API-03). */
+/** The one error shape every response uses (architecture.md section 4.2, API-03). */
 export interface ErrorBody {
   readonly error: {
     readonly code: string;

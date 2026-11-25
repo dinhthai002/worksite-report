@@ -11,7 +11,7 @@ The usual DDD guideline is one aggregate per transaction, with other aggregates 
 
 ## Decision
 
-Approval writes both aggregates in one database transaction, owned by the reporting repository (architecture.md section 6.3).
+Approval writes both aggregates in one database transaction, owned by the reporting repository.
 
 - `PrismaDailyReportRepository` opens `$transaction`, updates the report conditionally on `version` and `status = SUBMITTED`, then updates each task with `WHERE approved_progress <= reported_progress`, and records the transition.
 - Any failed condition throws, and the whole transaction rolls back. The report stays `SUBMITTED` and no task changes.

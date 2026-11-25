@@ -1,4 +1,4 @@
-# Multi-stage build (architecture.md section 9).
+# Multi-stage build (architecture.md section 8).
 # build:   installs all dependencies, generates the Prisma client, compiles TypeScript
 # runtime: production dependencies and compiled output only, running as a non-root user
 # The same image serves the `migrate` and `api` services in docker-compose.yml.

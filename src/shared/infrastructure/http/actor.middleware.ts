@@ -29,7 +29,7 @@ const actorHeadersSchema = z.object({
 });
 
 /**
- * Reads the actor from the X-Actor-Id and X-Actor-Role headers (architecture.md section 5.1).
+ * Reads the actor from the X-Actor-Id and X-Actor-Role headers (architecture.md section 4.1).
  * Throws UnauthenticatedError when either is missing or invalid.
  */
 export function readActor(header: (name: string) => string | undefined): Actor {

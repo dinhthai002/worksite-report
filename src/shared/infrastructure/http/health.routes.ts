@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Logger } from "../logger";
 import type { ErrorBody } from "./error-handler";
 
-/** GET /health: liveness and database check (architecture.md section 5.2). Needs no actor. */
+/** GET /health: liveness and database check (architecture.md section 4). Needs no actor. */
 export function healthRoutes(checkDatabase: () => Promise<void>, logger: Logger): Router {
   const router = Router();
 

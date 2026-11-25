@@ -1,5 +1,5 @@
-// Models, constraints and the initial migration arrive with the database plan
-// (architecture.md section 6.1). Until then the schema only configures the client.
+// Models, constraints and the initial migration arrive with the first features; each feature designs its
+// tables in specs/NNN-name/data-model.md. Until then the schema only configures the client.
 
 generator client {
   provider = "prisma-client-js"
