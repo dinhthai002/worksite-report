@@ -1,0 +1,8 @@
+# Manual walkthrough of the main flow (README.md, "Run it").
+# Start the stack with `docker compose up --build`, then send the requests in order.
+# Feature requests (worksites, draft, submit, reject, approve) are added here as each feature lands.
+
+@baseUrl = http://localhost:3000
+
+### Liveness and database check. Needs no actor headers.
+GET {{baseUrl}}/health

@@ -1,0 +1,5 @@
+language js
+
+`$value as unknown as $type` as $cast where {
+  register_diagnostic(span=$cast, message="TS-03: do not cast through unknown (`as unknown as T`). Narrow the value instead.", severity="error")
+}

@@ -1,0 +1,15 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# Local environment (see .env.example)
+.env
+
+# Reference documents from another project: never committed
+reference/
+
+# Editor and OS files
+.DS_Store
+.idea/
+*.log

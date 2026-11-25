@@ -1,0 +1,11 @@
+// Models, constraints and the initial migration arrive with the database plan
+// (architecture.md section 6.1). Until then the schema only configures the client.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
