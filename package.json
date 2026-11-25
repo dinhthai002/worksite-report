@@ -16,6 +16,9 @@
     "arch": "depcruise src",
     "check": "npm run typecheck && npm run lint && npm run arch && npm test",
     "test": "jest --selectProjects unit",
+    "test:int": "jest --selectProjects integration --runInBand --passWithNoTests",
+    "test:api": "jest --selectProjects api --runInBand",
+    "test:all": "npm test && jest --selectProjects integration api --runInBand",
     "test:cov": "jest --selectProjects unit --coverage",
     "postinstall": "prisma generate"
   },

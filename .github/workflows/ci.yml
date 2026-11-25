@@ -42,5 +42,9 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Testcontainers starts PostgreSQL with the runner's Docker.
+      - name: Integration and API tests
+        run: npx jest --selectProjects integration api --runInBand
+
       - name: Docker build
         run: docker build --tag site-daily-report:ci .
