@@ -24,7 +24,11 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 COPY prisma ./prisma
 # Production dependencies include the Prisma CLI, which the `migrate` service runs.
-RUN npm ci --omit=dev && npm cache clean --force
+# Prisma lists TypeScript as an optional peer dependency, so npm installs it even with --omit=dev.
+# Nothing needs it at runtime; removing it saves about 24 MB.
+RUN npm ci --omit=dev \
+  && rm -rf node_modules/typescript node_modules/.bin/tsc node_modules/.bin/tsserver \
+  && npm cache clean --force
 COPY --from=build /app/dist ./dist
 USER node
 EXPOSE 3000
