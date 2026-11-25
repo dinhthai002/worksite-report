@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+dist
+coverage
+reference
+docs
+test
+http
+biome-plugins
+.env
+*.md
