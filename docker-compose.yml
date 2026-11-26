@@ -43,6 +43,9 @@ services:
     restart: "no"
 
   api:
+    # Same build as `migrate`, so `docker compose up --build` also recreates `api` with the new image
+    # (with `image:` alone, Compose keeps an existing api container on the old image).
+    build: .
     image: worksite-report:local
     environment: *app-environment
     ports:
