@@ -3,7 +3,7 @@ import type { Response } from "supertest";
 import { loadExample } from "../../prisma/seed";
 import { truncateAll } from "../support/database";
 import { createTestApp } from "../support/test-app";
-import { Caller, FOREMAN, MARK, TOWNHOUSE, WALLS } from "../support/townhouse";
+import { Caller, FOREMAN, LINDA, MARK, SITE_SUPERVISOR, TOWNHOUSE, WALLS } from "../support/townhouse";
 
 const databaseUrl: string | undefined = process.env.DATABASE_URL;
 if (databaseUrl === undefined) {
@@ -26,6 +26,7 @@ describe("concurrent writes", () => {
   const prisma = createPrismaClient(databaseUrl);
   const app = createTestApp(prisma);
   const mark = new Caller(app, MARK, FOREMAN);
+  const linda = new Caller(app, LINDA, SITE_SUPERVISOR);
 
   beforeEach(async () => {
     await truncateAll(prisma);
@@ -82,5 +83,24 @@ describe("concurrent writes", () => {
     ]);
     expect(new Set(responses.map((response) => response.body.id)).size).toBe(1);
     expect(await prisma.dailyReport.count()).toBe(1);
+  });
+
+  it("BR-15 two approvals of one report from the same version: one 200, one 409", async () => {
+    const draft = await mark.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: WALLS, reportedProgress: 55 }] });
+    await mark.submit(draft.body.id, { version: 1 });
+
+    const responses = settled(
+      await Promise.allSettled([
+        linda.approve(draft.body.id, { version: 2 }),
+        linda.approve(draft.body.id, { version: 2 }),
+      ]),
+    );
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    const loser = responses.find((response) => response.status === 409);
+    // Clarifications: the version is checked before the status, so the loser is told to reload, never "already approved".
+    expect(loser?.body.error.code).toBe("REPORT_VERSION_CONFLICT");
+    expect(await prisma.reportTransition.count({ where: { reportId: draft.body.id, toStatus: "APPROVED" } })).toBe(1);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: WALLS } })).approvedProgress).toBe(55);
   });
 });

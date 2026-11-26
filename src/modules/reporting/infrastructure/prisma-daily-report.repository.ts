@@ -3,8 +3,15 @@ import { Prisma } from "@prisma/client";
 import type { UserId } from "../../../shared/domain/actor";
 import { ConflictError } from "../../../shared/domain/errors";
 import type { WorksiteId } from "../../../shared/domain/ids";
+import { toProgress } from "../../../shared/domain/progress";
 import type { DatabaseClient } from "../../../shared/infrastructure/db";
-import type { DailyReport, ReportId, WorkDate } from "../domain/daily-report";
+import {
+  type DailyReport,
+  type OutdatedItem,
+  progressOutdated,
+  type ReportId,
+  type WorkDate,
+} from "../domain/daily-report";
 import type { AddResult, DailyReportRepository } from "../domain/daily-report.repository";
 import { toDailyReport, toDateColumn } from "./daily-report.mapper";
 
@@ -97,6 +104,77 @@ export class PrismaDailyReportRepository implements DailyReportRepository {
       return tx.dailyReport.findUniqueOrThrow({ where: { id: report.id }, include: WITH_CHILDREN });
     });
     return toDailyReport(row);
+  }
+
+  /**
+   * UC-3: writes an approval decided by DailyReport.approve, in one transaction (ADR 0004). This is the only write by
+   * the reporting module to a table owned by the worksite module.
+   */
+  async saveApproval(report: DailyReport, expectedVersion: number): Promise<DailyReport> {
+    const row = await this.client.$transaction(async (tx) => {
+      // BR-15: only the version the caller read, and only while SUBMITTED (ADR 0004).
+      const updated = await tx.dailyReport.updateMany({
+        where: { id: report.id, version: expectedVersion, status: "SUBMITTED" },
+        data: { status: report.status, version: { increment: 1 } },
+      });
+      if (updated.count === 0) {
+        throw await versionConflict(tx, report.id, expectedVersion);
+      }
+      await raiseApprovedProgress(tx, report);
+      await appendTransitions(tx, report);
+      return tx.dailyReport.findUniqueOrThrow({ where: { id: report.id }, include: WITH_CHILDREN });
+    });
+    return toDailyReport(row);
+  }
+}
+
+/**
+ * BR-9: every item's task gets the item's reported progress. A task is raised only when below it, so a task already at
+ * that value is not written and keeps its place in the worksite's list (spec FR-002). A task not raised must not be
+ * above the reported progress (BR-5 guard against a concurrent approval); if any is, the approval fails and the
+ * transaction rolls back (research R4).
+ */
+async function raiseApprovedProgress(tx: TransactionClient, report: DailyReport): Promise<void> {
+  // Research R4: one lock order for every approval, so two approvals sharing tasks cannot deadlock.
+  const byTaskId = [...report.items].sort((a, b) => (a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0));
+  const notRaised = new Set<string>();
+  for (const item of byTaskId) {
+    const raised = await tx.task.updateMany({
+      where: { id: item.taskId, worksiteId: report.worksiteId, approvedProgress: { lt: item.reportedProgress } },
+      data: { approvedProgress: item.reportedProgress },
+    });
+    if (raised.count === 0) {
+      notRaised.add(item.taskId);
+    }
+  }
+  if (notRaised.size === 0) {
+    return;
+  }
+  const tasks = await tx.task.findMany({
+    where: { id: { in: [...notRaised] }, worksiteId: report.worksiteId },
+    select: { id: true, name: true, approvedProgress: true },
+  });
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const outdated: OutdatedItem[] = [];
+  for (const item of report.items.filter((candidate) => notRaised.has(candidate.taskId))) {
+    const task = taskById.get(item.taskId);
+    if (task === undefined) {
+      throw new Error(
+        `Report ${report.id} refers to task ${item.taskId}, which is not in worksite ${report.worksiteId}`,
+      );
+    }
+    // BR-5 guard: equal is fine; above means another approval has moved past this report.
+    if (task.approvedProgress > item.reportedProgress) {
+      outdated.push({
+        taskId: item.taskId,
+        taskName: task.name,
+        reportedProgress: item.reportedProgress,
+        approvedProgress: toProgress(task.approvedProgress),
+      });
+    }
+  }
+  if (outdated.length > 0) {
+    throw progressOutdated(outdated);
   }
 }
 

@@ -150,6 +150,30 @@ export function assertCanCreateReportFor(workDate: WorkDate, today: string, limi
   }
 }
 
+/** An item of a report whose task's approved progress is already above it (BR-5 at approval). */
+export interface OutdatedItem {
+  readonly taskId: TaskId;
+  readonly taskName: string;
+  readonly reportedProgress: Progress;
+  readonly approvedProgress: Progress;
+}
+
+/**
+ * BR-5 at approval: the one refusal for a report that approved progress has moved past, naming every such task. Used
+ * by DailyReport.approve and by the repository's guard for a concurrent approval, so both answer the same way.
+ */
+export function progressOutdated(items: readonly OutdatedItem[]): RuleViolationError {
+  const tasks = items.length === 1 ? "1 task" : `${items.length} tasks`;
+  const each = items
+    .map((item) => `"${item.taskName}": reported ${item.reportedProgress}%, approved ${item.approvedProgress}%.`)
+    .join(" ");
+  return new RuleViolationError(
+    "REPORT_PROGRESS_OUTDATED",
+    `This report cannot be approved: approved progress is already above it for ${tasks}. ${each} Reject the report so its author can update it.`,
+    { tasks: items },
+  );
+}
+
 /** One item as a foreman enters it, before the rules are checked. */
 export interface DraftItemInput {
   readonly taskId: TaskId;
@@ -354,6 +378,60 @@ export class DailyReport {
       reason: null,
     };
     return this.with({ status: ReportStatus.SUBMITTED, transitions: [...this.transitions, transition] });
+  }
+
+  /**
+   * BR-12: only the site supervisor of the report's worksite approves it. A DRAFT gets the same answer (FR-009): the
+   * supervisor may not see drafts (FR-030), so approving one must not reveal that it is a draft.
+   */
+  assertCanApprove(actor: Actor, worksite: ReportWorksite): void {
+    const isTheSupervisor = actor.role === Role.SITE_SUPERVISOR && actor.id === worksite.supervisorId;
+    if (!isTheSupervisor || this.status === ReportStatus.DRAFT) {
+      throw new ForbiddenError(
+        "REPORT_APPROVAL_FORBIDDEN",
+        "You may not approve this report. Only the site supervisor of its worksite may approve it, once it is submitted.",
+        { reportId: this.id },
+      );
+    }
+  }
+
+  /**
+   * UC-3: the site supervisor approves a SUBMITTED report. Records the transition (BR-11). The repository then sets
+   * every item's task to its reported progress (BR-9). Neither the worksite's status (BR-3) nor the assignees (BR-4)
+   * are checked at approval (FR-008).
+   */
+  approve(actor: Actor, worksite: ReportWorksite, at: Date): DailyReport {
+    this.assertCanApprove(actor, worksite);
+    // BR-10: only a SUBMITTED report can be approved; an APPROVED one is final.
+    assertTransition(this.status, ReportStatus.APPROVED);
+    // BR-5 at approval: every task whose approved progress has moved past this report, not only the first.
+    const outdated: OutdatedItem[] = [];
+    for (const item of this.items) {
+      const task = worksite.tasks.find((candidate) => candidate.id === item.taskId);
+      if (task === undefined) {
+        throw new Error(`Report ${this.id} refers to task ${item.taskId}, which is not in worksite ${worksite.id}`);
+      }
+      if (item.reportedProgress < task.approvedProgress) {
+        outdated.push({
+          taskId: task.id,
+          taskName: task.name,
+          reportedProgress: item.reportedProgress,
+          approvedProgress: task.approvedProgress,
+        });
+      }
+    }
+    if (outdated.length > 0) {
+      throw progressOutdated(outdated);
+    }
+    // BR-11: who, when, and no reason for an approval.
+    const transition: ReportTransition = {
+      from: this.status,
+      to: ReportStatus.APPROVED,
+      actorId: actor.id,
+      occurredAt: at,
+      reason: null,
+    };
+    return this.with({ status: ReportStatus.APPROVED, transitions: [...this.transitions, transition] });
   }
 
   /**

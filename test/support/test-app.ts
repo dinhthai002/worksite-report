@@ -1,6 +1,6 @@
 import { type AppDependencies, createApp } from "@src/app";
 import { DEFAULT_BACKDATE_LIMIT_DAYS } from "@src/config";
-import { GetReport, PrismaDailyReportRepository, SaveDraft, SubmitReport } from "@src/modules/reporting";
+import { ApproveReport, GetReport, PrismaDailyReportRepository, SaveDraft, SubmitReport } from "@src/modules/reporting";
 import { GetWorksite, PrismaWorksiteRepository } from "@src/modules/worksite";
 import type { Clock } from "@src/shared/domain/clock";
 import { checkDatabase, type DatabaseClient } from "@src/shared/infrastructure/db";
@@ -40,6 +40,7 @@ export function createTestApp(
     saveDraft: new SaveDraft(reports, worksites, clock, DEFAULT_BACKDATE_LIMIT_DAYS),
     submitReport: new SubmitReport(reports, worksites, clock),
     getReport: new GetReport(reports, worksites),
+    approveReport: new ApproveReport(reports, worksites, clock),
     ...overrides,
   });
 }

@@ -1,6 +1,6 @@
 import { createPrismaClient } from "@src/shared/infrastructure/db";
 import { loadExample } from "../../prisma/seed";
-import { truncateAll } from "../support/database";
+import { insertUser, insertWorksite, truncateAll } from "../support/database";
 import { createTestApp } from "../support/test-app";
 import {
   Caller,
@@ -79,5 +79,27 @@ describe("report permissions", () => {
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("NOT_REPORT_AUTHOR");
     expect(response.body.error.details).toEqual({ reportId: draft.body.id });
+  });
+
+  it("BR-12 a foreman cannot approve a report", async () => {
+    const draft = await mark.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: WALLS, reportedProgress: 55 }] });
+    await mark.submit(draft.body.id, { version: 1 });
+
+    const response = await henry.approve(draft.body.id, { version: 2 });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("REPORT_APPROVAL_FORBIDDEN");
+  });
+
+  it("BR-12 a supervisor of another worksite cannot approve a report", async () => {
+    const draft = await mark.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: WALLS, reportedProgress: 55 }] });
+    await mark.submit(draft.body.id, { version: 1 });
+    const sam = await insertUser(prisma, { role: "SITE_SUPERVISOR" });
+    await insertWorksite(prisma, { supervisorId: sam.id });
+
+    const response = await new Caller(app, sam.id, SITE_SUPERVISOR).approve(draft.body.id, { version: 2 });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("REPORT_APPROVAL_FORBIDDEN");
   });
 });

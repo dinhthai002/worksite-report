@@ -29,4 +29,13 @@ export interface DailyReportRepository {
    * REPORT_VERSION_CONFLICT when the stored version differs. Returns the report as stored.
    */
   save(report: DailyReport, expectedVersion: number): Promise<DailyReport>;
+
+  /**
+   * Writes an approval in one transaction (ADR 0004, BR-9): the report conditionally on expectedVersion and status
+   * SUBMITTED (BR-15), each task's approved progress raised to the reported progress only when below it, in ascending
+   * task ID order, a task not raised checked not to be above it (BR-5 guard), and the new transition (BR-11). A task
+   * already at the reported value is not written. Any failed condition rolls back everything. Throws
+   * REPORT_VERSION_CONFLICT or REPORT_PROGRESS_OUTDATED. Returns the report as stored.
+   */
+  saveApproval(report: DailyReport, expectedVersion: number): Promise<DailyReport>;
 }

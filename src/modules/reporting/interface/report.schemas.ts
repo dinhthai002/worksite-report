@@ -39,3 +39,9 @@ export const reportParams = z.object({ reportId: z.uuid() });
 
 /** POST /reports/:reportId/submit (contracts/submit-report.md). The version is required (BR-15). */
 export const submitReportBody = z.strictObject({ version: z.number().int().min(1) });
+
+/**
+ * POST /reports/:reportId/approve (contracts/approve-report.md). The version and nothing else: a reason or comment is
+ * refused like any other unknown field (spec FR-015, Clarifications; research R6).
+ */
+export const approveReportBody = z.strictObject({ version: z.number().int().min(1) });

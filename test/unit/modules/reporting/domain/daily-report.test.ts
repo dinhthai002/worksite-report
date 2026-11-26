@@ -381,3 +381,194 @@ describe("who may view", () => {
     );
   });
 });
+
+describe("approve", () => {
+  const approvedAt = new Date("2026-11-21T03:00:00Z");
+  const sam: Actor = { id: toUserId("00000000-0000-4000-8000-000000000009"), role: Role.SITE_SUPERVISOR };
+
+  function submittedWith(...items: { taskId: string; reportedProgress: number }[]): DailyReport {
+    return aReport()
+      .by(MARK.id)
+      .withNote("Rain from 15:00.")
+      .withItems(...items)
+      .submitted()
+      .build();
+  }
+
+  function refusalOf(attempt: () => unknown): unknown {
+    try {
+      attempt();
+    } catch (error) {
+      return error;
+    }
+    throw new Error("expected the attempt to be refused");
+  }
+
+  it("BR-11 approving records one transition SUBMITTED to APPROVED with the supervisor, the time and no reason", () => {
+    const report = submittedWith({ taskId: WALLS, reportedProgress: 55 });
+
+    const approved = report.approve(LINDA, townhouse(), approvedAt);
+
+    expect(approved.status).toBe(ReportStatus.APPROVED);
+    expect(approved.transitions).toEqual([
+      ...report.transitions,
+      {
+        from: ReportStatus.SUBMITTED,
+        to: ReportStatus.APPROVED,
+        actorId: LINDA.id,
+        occurredAt: approvedAt,
+        reason: null,
+      },
+    ]);
+    expect(approved.items).toEqual(report.items);
+    expect(approved.note).toBe(report.note);
+    expect(approved.version).toBe(report.version);
+  });
+
+  it.each([
+    ["the author", MARK],
+    ["another foreman", HENRY],
+  ])("BR-12 rejects approval by a foreman: %s", (_who, actor) => {
+    const report = submittedWith({ taskId: WALLS, reportedProgress: 55 });
+
+    expect(() => report.approve(actor, townhouse(), approvedAt)).toThrow(ForbiddenError);
+    expect(() => report.approve(actor, townhouse(), approvedAt)).toThrow(
+      expect.objectContaining({ code: "REPORT_APPROVAL_FORBIDDEN", details: { reportId: report.id } }),
+    );
+  });
+
+  it("BR-12 rejects approval by a supervisor of another worksite", () => {
+    const report = submittedWith({ taskId: WALLS, reportedProgress: 55 });
+
+    expect(() => report.approve(sam, townhouse(), approvedAt)).toThrow(
+      expect.objectContaining({ code: "REPORT_APPROVAL_FORBIDDEN" }),
+    );
+  });
+
+  it("rejects approval of a DRAFT with exactly the BR-12 refusal", () => {
+    const draft = aReport().by(MARK.id).withItems({ taskId: WALLS, reportedProgress: 55 }).build();
+    const submitted = aReport()
+      .withId(draft.id)
+      .by(MARK.id)
+      .withItems({ taskId: WALLS, reportedProgress: 55 })
+      .submitted()
+      .build();
+
+    const forDraft = refusalOf(() => draft.approve(LINDA, townhouse(), approvedAt));
+    const forOtherSupervisor = refusalOf(() => submitted.approve(sam, townhouse(), approvedAt));
+
+    expect(forDraft).toBeInstanceOf(ForbiddenError);
+    expect(forDraft).toEqual(forOtherSupervisor);
+    expect(forDraft).toMatchObject({ code: "REPORT_APPROVAL_FORBIDDEN" });
+    expect((forDraft as ForbiddenError).message).toBe((forOtherSupervisor as ForbiddenError).message);
+    expect((forDraft as ForbiddenError).details).toEqual((forOtherSupervisor as ForbiddenError).details);
+  });
+
+  it("BR-10 an APPROVED report cannot be approved again", () => {
+    const report = aReport().by(MARK.id).withItems({ taskId: WALLS, reportedProgress: 55 }).approved().build();
+
+    expect(() => report.approve(LINDA, townhouse(), approvedAt)).toThrow(
+      expect.objectContaining({ code: "INVALID_STATUS_TRANSITION", details: { from: "APPROVED", to: "APPROVED" } }),
+    );
+  });
+
+  it("BR-10 an APPROVED report cannot be edited", () => {
+    const report = aReport().by(MARK.id).withItems({ taskId: WALLS, reportedProgress: 55 }).approved().build();
+
+    expect(() => report.edit(MARK, townhouse(), content({ taskId: WALLS, reportedProgress: 60 }))).toThrow(
+      expect.objectContaining({ code: "REPORT_NOT_EDITABLE", details: { status: "APPROVED" } }),
+    );
+  });
+
+  it("BR-10 an APPROVED report cannot be submitted", () => {
+    const report = aReport().by(MARK.id).withItems({ taskId: WALLS, reportedProgress: 55 }).approved().build();
+
+    expect(() => report.submit(MARK, townhouse(), approvedAt)).toThrow(
+      expect.objectContaining({ code: "INVALID_STATUS_TRANSITION", details: { from: "APPROVED", to: "SUBMITTED" } }),
+    );
+  });
+
+  it("rejects approving a REJECTED report, stating the status", () => {
+    const report = aReport().by(MARK.id).withItems({ taskId: WALLS, reportedProgress: 55 }).rejected().build();
+
+    expect(() => report.approve(LINDA, townhouse(), approvedAt)).toThrow(
+      expect.objectContaining({ code: "INVALID_STATUS_TRANSITION", details: { from: "REJECTED", to: "APPROVED" } }),
+    );
+  });
+
+  it("BR-5 rejects approval when a task's approved progress is above the reported progress, naming the task and both figures", () => {
+    const report = submittedWith({ taskId: WALLS, reportedProgress: 40 });
+    const movedOn = townhouse(aWorksite()).tasks.map((task) =>
+      task.id === WALLS
+        ? aTask().withId(WALLS).named(task.name).assignedTo(MARK.id).withApprovedProgress(60).build()
+        : task,
+    );
+    const worksite = aWorksite()
+      .supervisedBy(LINDA.id)
+      .withTasks(...movedOn)
+      .build();
+
+    expect(() => report.approve(LINDA, worksite, approvedAt)).toThrow(RuleViolationError);
+    expect(() => report.approve(LINDA, worksite, approvedAt)).toThrow(
+      expect.objectContaining({
+        code: "REPORT_PROGRESS_OUTDATED",
+        message:
+          'This report cannot be approved: approved progress is already above it for 1 task. "Build ground-floor walls": reported 40%, approved 60%. Reject the report so its author can update it.',
+        details: {
+          tasks: [{ taskId: WALLS, taskName: "Build ground-floor walls", reportedProgress: 40, approvedProgress: 60 }],
+        },
+      }),
+    );
+  });
+
+  it("BR-5 lists every outdated task, in item order", () => {
+    const report = submittedWith({ taskId: WALLS, reportedProgress: 45 }, { taskId: FOUNDATION, reportedProgress: 90 });
+    const worksite = aWorksite()
+      .supervisedBy(LINDA.id)
+      .withTasks(
+        aTask().withId(FOUNDATION).named("Pour foundation").assignedTo(MARK.id).withApprovedProgress(100).build(),
+        aTask().withId(WALLS).named("Build ground-floor walls").assignedTo(MARK.id).withApprovedProgress(50).build(),
+      )
+      .build();
+
+    expect(() => report.approve(LINDA, worksite, approvedAt)).toThrow(
+      expect.objectContaining({
+        code: "REPORT_PROGRESS_OUTDATED",
+        details: {
+          tasks: [
+            { taskId: WALLS, taskName: "Build ground-floor walls", reportedProgress: 45, approvedProgress: 50 },
+            { taskId: FOUNDATION, taskName: "Pour foundation", reportedProgress: 90, approvedProgress: 100 },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("BR-5 accepts reported progress equal to approved progress", () => {
+    const report = submittedWith({ taskId: WALLS, reportedProgress: 40 });
+
+    expect(report.approve(LINDA, townhouse(), approvedAt).status).toBe(ReportStatus.APPROVED);
+  });
+
+  it("FR-008 accepts a CLOSED worksite and a task now assigned to another foreman", () => {
+    const report = submittedWith({ taskId: WALLS, reportedProgress: 55 });
+    const closedAndReassigned = aWorksite()
+      .supervisedBy(LINDA.id)
+      .closed()
+      .withTasks(
+        aTask().withId(WALLS).named("Build ground-floor walls").assignedTo(HENRY.id).withApprovedProgress(40).build(),
+      )
+      .build();
+
+    expect(report.approve(LINDA, closedAndReassigned, approvedAt).status).toBe(ReportStatus.APPROVED);
+  });
+
+  it("fails loudly when an item's task is not in the worksite", () => {
+    const report = submittedWith({ taskId: ELECTRICAL, reportedProgress: 10 });
+    const withoutElectrical = aWorksite().supervisedBy(LINDA.id).build();
+
+    expect(() => report.approve(LINDA, withoutElectrical, approvedAt)).toThrow(
+      `Report ${report.id} refers to task ${ELECTRICAL}, which is not in worksite ${withoutElectrical.id}`,
+    );
+  });
+});

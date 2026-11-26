@@ -254,3 +254,266 @@ describe("PrismaDailyReportRepository", () => {
     expect(otherDate).toBeUndefined();
   });
 });
+
+describe("PrismaDailyReportRepository.saveApproval", () => {
+  const prisma = createPrismaClient(databaseUrl);
+  const reports = new PrismaDailyReportRepository(prisma);
+  const ApprovedAt = new Date("2026-11-21T03:00:00Z");
+
+  beforeEach(async () => {
+    await truncateAll(prisma);
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  interface Site {
+    readonly worksiteId: string;
+    readonly authorId: string;
+    readonly supervisorId: string;
+  }
+
+  async function aSite(): Promise<Site> {
+    const supervisor = await insertUser(prisma, { role: "SITE_SUPERVISOR" });
+    const author = await insertUser(prisma);
+    const worksite = await insertWorksite(prisma, { supervisorId: supervisor.id });
+    return { worksiteId: worksite.id, authorId: author.id, supervisorId: supervisor.id };
+  }
+
+  /** A task last changed long ago, so a test can tell whether approval wrote it. */
+  async function aTaskAt(site: Site, approvedProgress: number): Promise<string> {
+    const task = await insertTask(prisma, {
+      worksiteId: site.worksiteId,
+      assigneeId: site.authorId,
+      approvedProgress,
+      createdAt: LONG_AGO,
+      updatedAt: LONG_AGO,
+    });
+    return task.id;
+  }
+
+  /** A SUBMITTED report, version 2, with one DRAFT → SUBMITTED transition, as loaded by the repository. */
+  async function aSubmittedReport(
+    site: Site,
+    workDate: string,
+    items: readonly { taskId: string; reportedProgress: number }[],
+  ): Promise<DailyReport> {
+    const row = await insertReport(prisma, {
+      worksiteId: site.worksiteId,
+      authorId: site.authorId,
+      workDate,
+      status: "SUBMITTED",
+      version: 2,
+    });
+    for (const { taskId, reportedProgress } of items) {
+      await insertReportItem(prisma, { reportId: row.id, taskId, reportedProgress });
+    }
+    await insertTransition(prisma, { reportId: row.id, actorId: site.authorId });
+    const loaded = await reports.findById(toReportId(row.id));
+    if (loaded === undefined) {
+      throw new Error("the prepared report did not load");
+    }
+    return loaded;
+  }
+
+  /** What DailyReport.approve returns: APPROVED, with one more transition by the supervisor. */
+  function approvedBy(report: DailyReport, supervisorId: string): DailyReport {
+    return changed(report, {
+      status: ReportStatus.APPROVED,
+      transitions: [
+        ...report.transitions,
+        {
+          from: ReportStatus.SUBMITTED,
+          to: ReportStatus.APPROVED,
+          actorId: toUserId(supervisorId),
+          occurredAt: ApprovedAt,
+          reason: null,
+        },
+      ],
+    });
+  }
+
+  async function taskRow(id: string): Promise<{ approvedProgress: number; updatedAt: Date }> {
+    return prisma.task.findUniqueOrThrow({ where: { id }, select: { approvedProgress: true, updatedAt: true } });
+  }
+
+  async function approvalCount(reportId: string): Promise<number> {
+    return prisma.reportTransition.count({ where: { reportId, toStatus: "APPROVED" } });
+  }
+
+  it("BR-9 approval writes the status, version + 1, the transition and every item's task, and no other task", async () => {
+    const site = await aSite();
+    const walls = await aTaskAt(site, 40);
+    const roof = await aTaskAt(site, 10);
+    const untouched = await aTaskAt(site, 5);
+    const report = await aSubmittedReport(site, "2026-11-20", [
+      { taskId: walls, reportedProgress: 55 },
+      { taskId: roof, reportedProgress: 20 },
+    ]);
+
+    const stored = await reports.saveApproval(approvedBy(report, site.supervisorId), report.version);
+
+    expect(stored.status).toBe(ReportStatus.APPROVED);
+    expect(stored.version).toBe(3);
+    expect(stored.transitions.map((transition) => transition.to)).toEqual([
+      ReportStatus.SUBMITTED,
+      ReportStatus.APPROVED,
+    ]);
+    expect(stored.transitions[1]).toEqual(
+      expect.objectContaining({ actorId: site.supervisorId, occurredAt: ApprovedAt, reason: null }),
+    );
+    expect((await taskRow(walls)).approvedProgress).toBe(55);
+    expect((await taskRow(roof)).approvedProgress).toBe(20);
+    expect(await taskRow(untouched)).toEqual({ approvedProgress: 5, updatedAt: LONG_AGO });
+  });
+
+  it("BR-9 a task reported at its current approved progress is not written", async () => {
+    const site = await aSite();
+    const walls = await aTaskAt(site, 40);
+    const roof = await aTaskAt(site, 10);
+    const report = await aSubmittedReport(site, "2026-11-20", [
+      { taskId: walls, reportedProgress: 40 },
+      { taskId: roof, reportedProgress: 20 },
+    ]);
+
+    await reports.saveApproval(approvedBy(report, site.supervisorId), report.version);
+
+    expect(await taskRow(walls)).toEqual({ approvedProgress: 40, updatedAt: LONG_AGO });
+    expect(await taskRow(roof)).toEqual(expect.objectContaining({ approvedProgress: 20 }));
+    expect((await taskRow(roof)).updatedAt).not.toEqual(LONG_AGO);
+  });
+
+  it("BR-9 an approval where one of two tasks is already higher rolls back: the report stays SUBMITTED and no task changes", async () => {
+    const site = await aSite();
+    const walls = await aTaskAt(site, 40);
+    const roof = await aTaskAt(site, 10);
+    const report = await aSubmittedReport(site, "2026-11-20", [
+      { taskId: walls, reportedProgress: 55 },
+      { taskId: roof, reportedProgress: 20 },
+    ]);
+    // Another approval raised the roof task since submission. The updated_at trigger stamps this write too.
+    await prisma.task.update({ where: { id: roof }, data: { approvedProgress: 30 } });
+    const roofBefore = await prisma.task.findUniqueOrThrow({ where: { id: roof } });
+
+    const approval = reports.saveApproval(approvedBy(report, site.supervisorId), report.version);
+
+    await expect(approval).rejects.toMatchObject({
+      code: "REPORT_PROGRESS_OUTDATED",
+      details: { tasks: [{ taskId: roof, taskName: roofBefore.name, reportedProgress: 20, approvedProgress: 30 }] },
+    });
+    expect(await prisma.dailyReport.findUniqueOrThrow({ where: { id: report.id } })).toEqual(
+      expect.objectContaining({ status: "SUBMITTED", version: 2 }),
+    );
+    expect(await prisma.reportTransition.count({ where: { reportId: report.id } })).toBe(1);
+    expect(await taskRow(walls)).toEqual({ approvedProgress: 40, updatedAt: LONG_AGO });
+    expect(await taskRow(roof)).toEqual({ approvedProgress: 30, updatedAt: roofBefore.updatedAt });
+  });
+
+  it("BR-5 with both tasks already higher, the refusal lists both in item order", async () => {
+    const site = await aSite();
+    const walls = await aTaskAt(site, 40);
+    const roof = await aTaskAt(site, 10);
+    const report = await aSubmittedReport(site, "2026-11-20", [
+      { taskId: walls, reportedProgress: 55 },
+      { taskId: roof, reportedProgress: 20 },
+    ]);
+    await prisma.task.updateMany({ where: { id: { in: [walls, roof] } }, data: { approvedProgress: 90 } });
+
+    const approval = reports.saveApproval(approvedBy(report, site.supervisorId), report.version);
+
+    await expect(approval).rejects.toMatchObject({
+      code: "REPORT_PROGRESS_OUTDATED",
+      details: {
+        tasks: report.items.map((reportItem) =>
+          expect.objectContaining({ taskId: reportItem.taskId, approvedProgress: 90 }),
+        ),
+      },
+    });
+  });
+
+  it("BR-5 reports approved out of date order: approving the 19th at 40% after the 20th at 60% fails", async () => {
+    const site = await aSite();
+    const walls = await aTaskAt(site, 40);
+    const nineteenth = await aSubmittedReport(site, "2026-11-19", [{ taskId: walls, reportedProgress: 40 }]);
+    const twentieth = await aSubmittedReport(site, "2026-11-20", [{ taskId: walls, reportedProgress: 60 }]);
+
+    await reports.saveApproval(approvedBy(twentieth, site.supervisorId), twentieth.version);
+    const late = reports.saveApproval(approvedBy(nineteenth, site.supervisorId), nineteenth.version);
+
+    await expect(late).rejects.toMatchObject({ code: "REPORT_PROGRESS_OUTDATED" });
+    expect((await taskRow(walls)).approvedProgress).toBe(60);
+    expect((await prisma.dailyReport.findUniqueOrThrow({ where: { id: nineteenth.id } })).status).toBe("SUBMITTED");
+  });
+
+  it("BR-15 two approvals of the same report started together: exactly one succeeds", async () => {
+    const site = await aSite();
+    const walls = await aTaskAt(site, 40);
+    const report = await aSubmittedReport(site, "2026-11-20", [{ taskId: walls, reportedProgress: 55 }]);
+    const approved = approvedBy(report, site.supervisorId);
+
+    const outcomes = await Promise.allSettled([
+      reports.saveApproval(approved, report.version),
+      reports.saveApproval(approved, report.version),
+    ]);
+
+    expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+    const rejected = outcomes.filter((outcome) => outcome.status === "rejected");
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toBeInstanceOf(ConflictError);
+    expect(rejected[0]?.reason).toMatchObject({ code: "REPORT_VERSION_CONFLICT", details: { currentVersion: 3 } });
+    expect(await approvalCount(report.id)).toBe(1);
+    expect((await taskRow(walls)).approvedProgress).toBe(55);
+  });
+
+  it("BR-5 two reports sharing a task, at 50% and 60%, approved together never leave the task at 50%", async () => {
+    const site = await aSite();
+    const walls = await aTaskAt(site, 40);
+    const fifty = await aSubmittedReport(site, "2026-11-19", [{ taskId: walls, reportedProgress: 50 }]);
+    const sixty = await aSubmittedReport(site, "2026-11-20", [{ taskId: walls, reportedProgress: 60 }]);
+
+    const [fiftyOutcome, sixtyOutcome] = await Promise.allSettled([
+      reports.saveApproval(approvedBy(fifty, site.supervisorId), fifty.version),
+      reports.saveApproval(approvedBy(sixty, site.supervisorId), sixty.version),
+    ]);
+
+    expect(sixtyOutcome?.status).toBe("fulfilled");
+    if (fiftyOutcome?.status === "rejected") {
+      expect(fiftyOutcome.reason).toMatchObject({ code: "REPORT_PROGRESS_OUTDATED" });
+    }
+    expect((await taskRow(walls)).approvedProgress).toBe(60);
+  });
+
+  it("two reports sharing two tasks approved together do not deadlock", async () => {
+    // Guards the lock order (research R4). The two transactions may not overlap on every run, so this catches a
+    // regression rather than proving that a deadlock cannot happen; the sorted update order is the proof.
+    const site = await aSite();
+    const first = await aTaskAt(site, 0);
+    const second = await aTaskAt(site, 0);
+    const a = await aSubmittedReport(site, "2026-11-19", [
+      { taskId: first, reportedProgress: 30 },
+      { taskId: second, reportedProgress: 70 },
+    ]);
+    const b = await aSubmittedReport(site, "2026-11-20", [
+      { taskId: second, reportedProgress: 60 },
+      { taskId: first, reportedProgress: 40 },
+    ]);
+
+    const outcomes = await Promise.allSettled([
+      reports.saveApproval(approvedBy(a, site.supervisorId), a.version),
+      reports.saveApproval(approvedBy(b, site.supervisorId), b.version),
+    ]);
+
+    for (const outcome of outcomes) {
+      if (outcome.status === "rejected") {
+        expect(outcome.reason).toMatchObject({ code: "REPORT_PROGRESS_OUTDATED" });
+      }
+    }
+    expect(outcomes.some((outcome) => outcome.status === "fulfilled")).toBe(true);
+    const [firstRow, secondRow] = [await taskRow(first), await taskRow(second)];
+    const approvedA = outcomes[0]?.status === "fulfilled";
+    const approvedB = outcomes[1]?.status === "fulfilled";
+    expect(firstRow.approvedProgress).toBe(approvedB ? 40 : 30);
+    expect(secondRow.approvedProgress).toBe(approvedA ? 70 : 60);
+  });
+});
