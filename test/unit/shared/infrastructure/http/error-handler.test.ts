@@ -1,6 +1,7 @@
 import { ConflictError, ForbiddenError, NotFoundError, RuleViolationError } from "@src/shared/domain/errors";
 import { UnauthenticatedError } from "@src/shared/infrastructure/http/actor.middleware";
-import { toErrorResponse } from "@src/shared/infrastructure/http/error-handler";
+import { logRequestError, toErrorResponse } from "@src/shared/infrastructure/http/error-handler";
+import pino from "pino";
 import { z } from "zod";
 
 describe("toErrorResponse", () => {
@@ -33,12 +34,14 @@ describe("toErrorResponse", () => {
     });
   });
 
-  it("maps a missing or invalid actor to 401", () => {
-    const response = toErrorResponse(new UnauthenticatedError("Send the actor headers."));
+  it("maps a missing, invalid or unknown actor to 401 without the reason (FR-005a)", () => {
+    const error = new UnauthenticatedError("UNKNOWN_USER");
+
+    const response = toErrorResponse(error);
 
     expect(response).toEqual({
       status: 401,
-      body: { error: { code: "UNAUTHENTICATED", message: "Send the actor headers." } },
+      body: { error: { code: "UNAUTHENTICATED", message: error.message } },
     });
   });
 
@@ -90,5 +93,46 @@ describe("toErrorResponse", () => {
       status: 500,
       body: { error: { code: "INTERNAL_ERROR", message: "Something went wrong. Try again later." } },
     });
+  });
+});
+
+describe("logRequestError", () => {
+  function recordingLogger(): { logger: pino.Logger; lines: Record<string, unknown>[] } {
+    const lines: Record<string, unknown>[] = [];
+    const logger = pino({ level: "info" }, { write: (line: string): void => void lines.push(JSON.parse(line)) });
+    return { logger, lines };
+  }
+
+  const context = { method: "GET", path: "/worksites/1", requestId: "req-1" };
+
+  it("logs the reason of a 401 at warn (FR-005a)", () => {
+    const { logger, lines } = recordingLogger();
+
+    logRequestError(logger, new UnauthenticatedError("ROLE_MISMATCH"), 401, context);
+
+    expect(lines).toEqual([
+      expect.objectContaining({
+        level: 40,
+        reason: "ROLE_MISMATCH",
+        requestId: "req-1",
+        msg: "request not authenticated",
+      }),
+    ]);
+  });
+
+  it("logs a 5xx at error", () => {
+    const { logger, lines } = recordingLogger();
+
+    logRequestError(logger, new Error("boom"), 500, context);
+
+    expect(lines).toEqual([expect.objectContaining({ level: 50, msg: "request failed", requestId: "req-1" })]);
+  });
+
+  it("logs nothing extra for other client errors", () => {
+    const { logger, lines } = recordingLogger();
+
+    logRequestError(logger, new NotFoundError("WORKSITE_NOT_FOUND", "No such worksite."), 404, context);
+
+    expect(lines).toEqual([]);
   });
 });

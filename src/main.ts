@@ -3,6 +3,7 @@ import { type Config, loadConfig } from "./config";
 import { GetWorksite, PrismaWorksiteRepository } from "./modules/worksite";
 import { checkDatabase, createPrismaClient } from "./shared/infrastructure/db";
 import { createLogger, type Logger } from "./shared/infrastructure/logger";
+import { PrismaUserRepository } from "./shared/infrastructure/prisma-user.repository";
 
 /** How long in-flight requests get to finish after SIGTERM before the process is forced to exit. */
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -29,6 +30,7 @@ function main(): void {
   const app = createApp({
     logger,
     checkDatabase: () => checkDatabase(prisma),
+    users: new PrismaUserRepository(prisma),
     getWorksite: new GetWorksite(new PrismaWorksiteRepository(prisma)),
   });
   const server = app.listen(config.port, () => {

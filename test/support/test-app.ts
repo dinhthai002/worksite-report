@@ -2,6 +2,7 @@ import { type AppDependencies, createApp } from "@src/app";
 import { GetWorksite, PrismaWorksiteRepository } from "@src/modules/worksite";
 import { checkDatabase, type DatabaseClient } from "@src/shared/infrastructure/db";
 import { createLogger } from "@src/shared/infrastructure/logger";
+import { PrismaUserRepository } from "@src/shared/infrastructure/prisma-user.repository";
 import type { Express } from "express";
 
 /**
@@ -12,6 +13,7 @@ export function createTestApp(client: DatabaseClient, overrides: Partial<AppDepe
   return createApp({
     logger: createLogger("silent"),
     checkDatabase: () => checkDatabase(client),
+    users: new PrismaUserRepository(client),
     getWorksite: new GetWorksite(new PrismaWorksiteRepository(client)),
     ...overrides,
   });

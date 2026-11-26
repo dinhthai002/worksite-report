@@ -66,15 +66,34 @@ export function routeNotFound(): RequestHandler {
   };
 }
 
+export interface RequestContext {
+  readonly method: string;
+  readonly path: string;
+  readonly requestId: string | undefined;
+}
+
+/**
+ * Logs what operators need and the response must not show: the reason for a 401 (FR-005a) at warn, and the
+ * details of a 5xx at error (ERR-05). Other client errors are covered by the request log line (LOG-02).
+ */
+export function logRequestError(logger: Logger, error: unknown, status: number, context: RequestContext): void {
+  if (error instanceof UnauthenticatedError) {
+    logger.warn({ reason: error.reason, ...context }, "request not authenticated");
+    return;
+  }
+  if (status >= 500) {
+    logger.error({ err: error, ...context }, "request failed");
+  }
+}
+
 export function errorHandler(logger: Logger): ErrorRequestHandler {
   return (error: unknown, req: Request, res: Response, _next: NextFunction): void => {
     const response = toErrorResponse(error);
-    if (response.status >= 500) {
-      logger.error(
-        { err: error, method: req.method, path: req.path, requestId: res.locals.requestId },
-        "request failed",
-      );
-    }
+    logRequestError(logger, error, response.status, {
+      method: req.method,
+      path: req.path,
+      requestId: res.locals.requestId,
+    });
     res.status(response.status).json(response.body);
   };
 }
