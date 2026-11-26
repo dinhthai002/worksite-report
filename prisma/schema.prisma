@@ -1,5 +1,7 @@
-// Models, constraints and the initial migration arrive with the first features; each feature designs its
-// tables in specs/NNN-name/data-model.md. Until then the schema only configures the client.
+// Tables are designed per feature in specs/NNN-name/data-model.md. Constraints that this file cannot express
+// (CHECK constraints, the updated_at trigger) are added by hand to the generated migration (architecture.md 5.1).
+// Every table has created_at and updated_at; updated_at is maintained by the set_updated_at() trigger, so it is
+// not marked @updatedAt here.
 
 generator client {
   provider = "prisma-client-js"
@@ -8,4 +10,63 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  FOREMAN
+  SITE_SUPERVISOR
+
+  @@map("user_role")
+}
+
+enum WorksiteStatus {
+  ACTIVE
+  CLOSED
+
+  @@map("worksite_status")
+}
+
+model User {
+  id        String   @id @db.Uuid
+  name      String
+  role      UserRole
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  supervisedWorksites Worksite[]
+  assignedTasks       Task[]
+
+  @@map("users")
+}
+
+model Worksite {
+  id           String         @id @db.Uuid
+  name         String
+  supervisorId String         @map("supervisor_id") @db.Uuid
+  status       WorksiteStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  supervisor User   @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+  tasks      Task[]
+
+  @@index([supervisorId])
+  @@map("worksites")
+}
+
+model Task {
+  id               String   @id @db.Uuid
+  worksiteId       String   @map("worksite_id") @db.Uuid
+  name             String
+  assigneeId       String   @map("assignee_id") @db.Uuid
+  approvedProgress Int      @default(0) @map("approved_progress")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  worksite Worksite @relation(fields: [worksiteId], references: [id], onDelete: Restrict)
+  assignee User     @relation(fields: [assigneeId], references: [id], onDelete: Restrict)
+
+  @@index([worksiteId])
+  @@index([assigneeId])
+  @@map("tasks")
 }

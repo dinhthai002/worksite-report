@@ -1,6 +1,12 @@
-export const ROLES = ["FOREMAN", "SITE_SUPERVISOR"] as const;
+/** The two roles (glossary). Each user has exactly one (PRD, Roles). */
+export const Role = {
+  FOREMAN: "FOREMAN",
+  SITE_SUPERVISOR: "SITE_SUPERVISOR",
+} as const;
 
-export type Role = (typeof ROLES)[number];
+export type Role = (typeof Role)[keyof typeof Role];
+
+export const ROLES = [Role.FOREMAN, Role.SITE_SUPERVISOR] as const;
 
 declare const userIdBrand: unique symbol;
 

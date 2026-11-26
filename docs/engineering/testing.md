@@ -121,8 +121,6 @@ One scenario file per use case flow:
 | `npm run test:all` | All three |
 | `npm run test:cov` | Unit tests with coverage |
 
-Until the first integration test exists, `npm run test:int` runs with `--passWithNoTests`. Remove the flag when that test is added.
-
 ## 7. Coverage
 
 - `domain` and `application`: at least 90% of lines and branches, enforced in `jest.config.js`.

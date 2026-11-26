@@ -1,4 +1,10 @@
-import { isRole, toUserId } from "@src/shared/domain/actor";
+import { isRole, Role, toUserId } from "@src/shared/domain/actor";
+
+describe("Role", () => {
+  it("holds exactly FOREMAN and SITE_SUPERVISOR", () => {
+    expect(Object.values(Role)).toEqual(["FOREMAN", "SITE_SUPERVISOR"]);
+  });
+});
 
 describe("isRole", () => {
   it.each(["FOREMAN", "SITE_SUPERVISOR"])("accepts %s", (value) => {
