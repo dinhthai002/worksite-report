@@ -5,7 +5,7 @@
 
 ## Context
 
-BR-15 requires that a write based on a stale copy of a report is rejected, never silently applied. Conflicts are possible but rare: a foreman saves a draft from two devices, or a site supervisor approves while the foreman is still editing a rejected report. Users work over mobile networks and HTTP requests, so the time between reading a report and writing it can be minutes.
+BR-15 requires that a write based on a stale copy of a report is rejected, never silently applied. Conflicts are possible but rare: a foreman saves a draft from two devices, or a site supervisor approves a report from one screen and rejects it from another. Users work over mobile networks and HTTP requests, so the time between reading a report and writing it can be minutes.
 
 ## Decision
 

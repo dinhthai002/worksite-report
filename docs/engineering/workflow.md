@@ -43,7 +43,7 @@ Within a task group the order is: domain and its unit tests, then the use case a
 └── memory/
     └── constitution.md     project principles, derived from section 1 and the coding standard
 specs/
-└── 001-daily-report/
+└── 001-worksite-seed/
     ├── spec.md
     ├── plan.md
     ├── data-model.md
@@ -58,10 +58,12 @@ CLAUDE.md                   one line, `@AGENTS.md`, so Claude Code loads the sam
 These rules are written in `AGENTS.md`.
 
 - Read `docs/glossary.md` and the relevant sections of `docs/product/` before writing a spec or code. Use glossary terms exactly.
-- Do not resolve a conflict between a document and a request silently. Record it as an open question.
+- Do not resolve a conflict between a document and a request silently. State it and ask.
 - Do not change files under `docs/product/` or `docs/adr/` as a side effect of implementing a task.
 - Do not edit check configuration (`tsconfig.json`, `biome.json`, `.dependency-cruiser.cjs`, CI workflow) or add ignore comments to make a check pass.
-- Do not weaken or delete a failing test. Fix the code, or raise the question.
+- Do not weaken, skip, or delete a failing test. Fix the code, or raise the question.
+- Do not edit a committed migration.
+- Do not add a dependency without asking.
 - Run `npm run check` before reporting a task as done, and report the actual result.
 
 ## 6. Definition of done

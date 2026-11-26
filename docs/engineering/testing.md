@@ -27,7 +27,7 @@
 
 | Code | Rule | Level |
 | --- | --- | --- |
-| TST-01 | Every business rule BR-1 to BR-15 has at least one test, and the test name starts with the rule ID | MUST |
+| TST-01 | Every business rule BR-1 to BR-15 has at least one test, and the test name starts with the rule ID. BR-13 is built in step 5 of the implementation plan and has no test until then | MUST |
 | TST-02 | Test names state behavior, not implementation: `BR-5 rejects reported progress below approved progress` | MUST |
 | TST-03 | Tests follow arrange, act, assert, with one behavior per test | MUST |
 | TST-04 | Unit tests do not touch the database, the network, the file system, or the real clock | MUST |
@@ -52,7 +52,7 @@ describe("DailyReport", () => {
   it("BR-7 rejects submitting a report with no items", () => {
     const report = aReport().withNoItems().build();
 
-    expect(() => report.submit(foreman, clock.now())).toThrow(RuleViolationError);
+    expect(() => report.submit(foreman, worksite, clock.now())).toThrow(RuleViolationError);
   });
 });
 ```
@@ -104,7 +104,7 @@ One scenario file per use case flow:
 | `report-flow.api.test.ts` | UC-1 to UC-4 in sequence: draft, submit, reject, edit, resubmit, approve, then check task progress |
 | `idempotency.api.test.ts` | Five identical requests yield one report and five identical responses. Same key with a different body is rejected |
 | `concurrency.api.test.ts` | Two saves from the same version: one succeeds, one receives `409` |
-| `permissions.api.test.ts` | A foreman cannot approve. A foreman cannot report on another foreman's task. A supervisor of another worksite cannot approve |
+| `permissions.api.test.ts` | A foreman cannot approve or reject. A foreman cannot report on another foreman's task, or edit or submit another foreman's report. A supervisor of another worksite cannot approve or reject. A site supervisor cannot save, edit or submit a report |
 
 ## 6. Tooling
 

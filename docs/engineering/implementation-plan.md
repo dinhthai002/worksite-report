@@ -33,14 +33,16 @@ These apply to every step, in addition to the step's own exit criteria:
 
 ## 2. Overview
 
-| Step | Feature | Use case | New business rules | Endpoints | New tables |
-| --- | --- | --- | --- | --- | --- |
-| 0 | Spec-Kit setup | — | — | — | — |
-| 1 | `001-worksite-seed` | View a worksite and its tasks, from seeded data | none (identity and data foundation) | `GET /worksites/:worksiteId` | `users`, `worksites`, `tasks` |
-| 2 | `002-draft-and-submit` | UC-1 Draft a report, UC-2 Submit a report | BR-1 to BR-7, BR-11, BR-14, BR-15 | `PUT /worksites/:worksiteId/reports/:workDate`, `POST /reports/:reportId/submit`, `GET /reports/:reportId` | `daily_reports`, `report_items`, `report_transitions`, `idempotency_keys` |
-| 3 | `003-approve-report` | UC-3 Approve a report | BR-5 (at approval), BR-9, BR-10, BR-12 | `POST /reports/:reportId/approve` | none |
-| 4 | `004-reject-and-resubmit` | UC-4 Reject and resubmit, plus the full PRD flow end to end | BR-8 | `POST /reports/:reportId/reject` | none |
-| 5 | `005-worksite-management` | Create a worksite, add tasks, assign and reassign foremen | BR-13 | `POST /worksites`, `POST /worksites/:worksiteId/tasks`, `PUT /tasks/:taskId/assignee` | none |
+| Step | Feature | Use case | New business rules | Endpoints | New tables | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 | Spec-Kit setup | — | — | — | — | Done |
+| 1 | `001-worksite-seed` | View a worksite and its tasks, from seeded data | none (identity and data foundation) | `GET /worksites/:worksiteId` | `users`, `worksites`, `tasks` | Done |
+| 2 | `002-draft-and-submit` | UC-1 Draft a report, UC-2 Submit a report | BR-1 to BR-7, BR-11, BR-14, BR-15 | `PUT /worksites/:worksiteId/reports/:workDate`, `POST /reports/:reportId/submit`, `GET /reports/:reportId` | `daily_reports`, `report_items`, `report_transitions`, `idempotency_keys` | Done |
+| 3 | `003-approve-report` | UC-3 Approve a report | BR-5 (at approval), BR-9, BR-10, BR-12 | `POST /reports/:reportId/approve` | none | Done |
+| 4 | `004-reject-and-resubmit` | UC-4 Reject and resubmit, plus the full PRD flow end to end | BR-8 | `POST /reports/:reportId/reject` | none | Done |
+| 5 | `005-worksite-management` | Create a worksite, add tasks, assign and reassign foremen | BR-13 | `POST /worksites`, `POST /worksites/:worksiteId/tasks`, `PUT /tasks/:taskId/assignee` | none | Not started |
+
+Until step 5 is done, the PRD actions "Create a worksite" and "Create tasks and assign a foreman to each" have no endpoint, and BR-13 has no code or test. Worksites and tasks come only from the seed and the test builders.
 
 Each step depends on the one before it. Tables are created in the step that first uses them, so each table is designed after its step's spec is clarified (architecture.md, section 5; DB-05).
 

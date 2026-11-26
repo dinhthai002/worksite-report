@@ -13,7 +13,7 @@ The usual DDD guideline is one aggregate per transaction, with other aggregates 
 
 Approval writes both aggregates in one database transaction, owned by the reporting repository.
 
-- `PrismaDailyReportRepository` opens `$transaction`, updates the report conditionally on `version` and `status = SUBMITTED`, then updates each task with `WHERE approved_progress <= reported_progress`, and records the transition.
+- `PrismaDailyReportRepository` opens `$transaction`, updates the report conditionally on `version` and `status = SUBMITTED`, then records the transition. In between, it raises each task with `WHERE approved_progress < reported_progress`, in ascending task ID order so that two approvals sharing tasks cannot deadlock. It then checks that no task it did not raise is above the reported progress. A task already at the reported value is not written. Together the two conditions accept exactly the tasks that `approved_progress <= reported_progress` would accept (003 research R4).
 - Any failed condition throws, and the whole transaction rolls back. The report stays `SUBMITTED` and no task changes.
 - The `ApproveReport` use case still checks permissions (BR-12) and the state machine (BR-10) in the domain before calling the repository. The conditional task update is the concurrency guard for BR-5, not a second copy of the rule's logic.
 

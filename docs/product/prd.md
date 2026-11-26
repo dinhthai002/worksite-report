@@ -71,7 +71,7 @@ There are two roles, and each user has exactly one, so the person who approves a
 | --- | --- | --- |
 | Create a worksite | No | Yes, and becomes its supervisor |
 | Create tasks and assign a foreman to each | No | Yes, in worksites they supervise |
-| View worksites and tasks | Yes, only the tasks assigned to them | Yes, every task |
+| View worksites and tasks | Yes, any worksite, but only the tasks assigned to them | Yes, any worksite, with every task |
 | View reports | Yes, their own reports | Yes, reports in worksites they supervise, once submitted |
 | Create, edit, submit, and resubmit a report | Yes, their own report, on tasks assigned to them | No |
 | Approve or reject a report | No | Yes, in worksites they supervise |

@@ -35,7 +35,7 @@ Read only the sections you need for the current step.
 - One use case per file in `application`. Route handlers contain no business logic.
 - Every write to a report is conditional on `version`. A use case that changes more than one row uses one transaction.
 - Read the time through `Clock`. Read configuration through `config.ts`.
-- Use glossary terms exactly: `Worksite`, `Foreman`, `SiteSupervisor`, `DailyReport`, `approvedProgress`.
+- Use glossary terms exactly: `Worksite`, `Role.FOREMAN`, `Role.SITE_SUPERVISOR`, `DailyReport`, `approvedProgress`.
 - Every business rule has a test whose name starts with the rule ID.
 
 ## Do not

@@ -29,7 +29,7 @@ A modular monolith following DDD tactical patterns: one codebase, one Docker ima
 
 Checked by `dependency-cruiser` in CI (coding standard, ARC-01 to ARC-04 and DB-01).
 
-- `interface` → `application` → `domain`. `infrastructure` implements the ports declared in `domain`.
+- `interface` → `application` → `domain`. `infrastructure` implements the ports declared in `domain`. The one port declared outside `domain` is `IdempotencyKeyRepository`, in `shared/infrastructure/http/idempotency.middleware.ts`, because request keys are an HTTP concern, not a domain one.
 - `domain` imports nothing outside its own `domain` and `shared/domain`. No `express`, no `@prisma/client`, no `zod`.
 - A module is imported only through its `index.ts`. Dependencies between modules go one way; the allowed direction is fixed in the coding standard (ARC-04).
 - `shared` does not import `modules`.
@@ -69,7 +69,7 @@ worksite-report/
 ├── .dockerignore
 ├── package.json
 ├── tsconfig.json
-├── tsconfig.build.json     compiles src/ to dist/
+├── tsconfig.build.json     compiles src/ and prisma/seed.ts to dist/src/ and dist/prisma/
 ├── biome.json
 ├── biome-plugins/          GritQL rules for TS-03 and ARC-10
 ├── .dependency-cruiser.cjs
@@ -110,8 +110,10 @@ worksite-report/
 │   │       └── index.ts          the module's public API
 │   │
 │   └── shared/
-│       ├── domain/               concepts used by every module: actor, clock, errors
-│       └── infrastructure/       db.ts, system-clock.ts, logger.ts,
+│       ├── domain/               concepts used by every module: actor, clock, errors, IDs,
+│       │                         progress, the user repository port
+│       └── infrastructure/       db.ts, system-clock.ts, logger.ts, Prisma repositories for
+│                                 users and request keys,
 │                                 http/ (middleware, error-handler.ts, health.routes.ts)
 │
 └── test/
@@ -119,6 +121,7 @@ worksite-report/
     ├── teardown.ts               stops the container (Jest globalTeardown)
     ├── test-database.ts          container state shared by setup and teardown
     ├── fakes/                    in-memory fakes for ports, FixedClock
+    ├── support/                  test data builders, the PRD example, table truncation, app factory
     ├── unit/                     mirrors src/: src/a/b.ts is tested in test/unit/a/b.test.ts
     ├── integration/              repositories against real PostgreSQL
     └── api/                      HTTP flows through the full app
@@ -153,13 +156,16 @@ Every error has the same shape (API-03). Domain errors are mapped to HTTP status
 
 | Status | When |
 | --- | --- |
-| `400` | The request fails schema validation, or the body is not valid JSON |
+| `400` | The request fails schema validation (`VALIDATION_FAILED`), or the body is not valid JSON (`MALFORMED_JSON`) |
 | `401` | Actor headers missing or invalid |
 | `403` | The actor is not allowed to perform the action (`ForbiddenError`) |
 | `404` | The resource or route does not exist (`NotFoundError`) |
 | `409` | A stale `version`, or the current state does not allow the action (`ConflictError`) |
 | `422` | A business rule is violated, or a request key is reused with different content (`RuleViolationError`) |
 | `500` | Any other error. The response is generic; details go to the log only (ERR-05) |
+| `503` | `GET /health` only: the database is unreachable (`DATABASE_UNAVAILABLE`) |
+
+Any other client error raised while reading the request (for example `413` for a body that is too large) keeps its status, with the code `INVALID_REQUEST`.
 
 ## 5. Persistence
 
@@ -192,7 +198,7 @@ A use case that changes more than one row does it in a single `$transaction` (DB
 
 Every table has `created_at` and `updated_at`, both `timestamptz` and defaulting to `now()`. `updated_at` is maintained by the database: the trigger function `set_updated_at()` runs `BEFORE UPDATE` on each table, so no write path can skip it. A feature that adds a table adds both columns and the trigger in its migration.
 
-Lists are ordered by `updated_at` descending (most recently changed first), then `created_at` ascending, then `id`, so the order is the same on every request for the same data.
+Lists are ordered by `updated_at` descending (most recently changed first), then `created_at` ascending, then `id`, so the order is the same on every request for the same data. Report items have no `id` column, so they break the last tie by `task_id`. The one exception is a report's transitions: they are a history, so they are listed oldest first, by `occurred_at` and then `id`.
 
 ## 6. Request flow
 
@@ -204,7 +210,7 @@ Every request that changes state goes through the same path:
 4. The module's route validates the input with Zod and calls one use case (ARC-07).
 5. The use case loads aggregates through repository ports, checks permissions, and calls methods on the aggregates, which enforce the business rules (ARC-05).
 6. The repository writes the result, conditionally on `version` and in one transaction where needed.
-7. `error-handler.ts` turns any error into the response shape in 4.2. On success, the response is stored against the request key; on failure, the key is released.
+7. `error-handler.ts` turns any error into the response shape in 4.2. `idempotency.middleware.ts` sees every response as it is sent: a success is stored against the request key before it goes out, and an error releases the key.
 
 ## 7. Configuration
 
@@ -226,7 +232,7 @@ The application runs with Docker Compose. One command starts everything: `docker
 
 | Service | Image | Role |
 | --- | --- | --- |
-| `db` | `postgres:17` | Database, with a named volume and a `pg_isready` healthcheck |
+| `db` | `postgres:17.11` | Database, with a named volume and a `pg_isready` healthcheck |
 | `migrate` | Application image | Runs `prisma migrate deploy`, then the seed in fill mode (adds missing example rows, changes nothing that exists), then exits. Starts after `db` is healthy |
 | `api` | Application image | Runs the HTTP server. Starts after `migrate` completes successfully. Healthcheck on `GET /health` |
 
