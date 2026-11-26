@@ -104,6 +104,7 @@ One scenario file per use case flow:
 | `report-flow.api.test.ts` | UC-1 to UC-4 in sequence: draft, submit, reject, edit, resubmit, approve, then check task progress |
 | `idempotency.api.test.ts` | Five identical requests yield one report and five identical responses. Same key with a different body is rejected |
 | `concurrency.api.test.ts` | Two saves from the same version: one succeeds, one receives `409` |
+| `openapi.api.test.ts` | `/openapi.json` and `/docs` need no actor. The description lists exactly the routes the app answers. Real responses match the described `WorksiteView`, `ReportView` and `ErrorBody` (API-05) |
 | `permissions.api.test.ts` | A foreman cannot approve or reject. A foreman cannot report on another foreman's task, or edit or submit another foreman's report. A supervisor of another worksite cannot approve or reject. A site supervisor cannot save, edit or submit a report |
 
 ## 6. Tooling

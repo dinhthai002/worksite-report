@@ -3,19 +3,22 @@ import {
   type ApproveReport,
   type GetReport,
   type RejectReport,
+  reportOpenApi,
   reportRoutes,
   type SaveDraft,
   type SubmitReport,
 } from "./modules/reporting";
-import { type GetWorksite, worksiteRoutes } from "./modules/worksite";
+import { type GetWorksite, worksiteOpenApi, worksiteRoutes } from "./modules/worksite";
 import type { UserRepository } from "./shared/domain/user.repository";
 import { actorMiddleware } from "./shared/infrastructure/http/actor.middleware";
+import { docsRoutes } from "./shared/infrastructure/http/docs.routes";
 import { errorHandler, routeNotFound } from "./shared/infrastructure/http/error-handler";
 import { healthRoutes } from "./shared/infrastructure/http/health.routes";
 import {
   type IdempotencyKeyRepository,
   idempotencyMiddleware,
 } from "./shared/infrastructure/http/idempotency.middleware";
+import { buildOpenApiDocument } from "./shared/infrastructure/http/openapi";
 import { requestLogMiddleware } from "./shared/infrastructure/http/request-log.middleware";
 import type { Logger } from "./shared/infrastructure/logger";
 
@@ -41,6 +44,8 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use(express.json());
 
   app.use(healthRoutes(dependencies.checkDatabase, dependencies.logger));
+  // GET /openapi.json and the Swagger UI at /docs, readable without identity (API-05).
+  app.use(docsRoutes(buildOpenApiDocument([worksiteOpenApi, reportOpenApi])));
 
   // Every route below needs the caller's identity.
   app.use(actorMiddleware(dependencies.users));

@@ -31,7 +31,7 @@ Each rule has a code for citing in reviews. The **Check** column names what enfo
 | NAM-02 | Classes and types are `PascalCase`. Functions and variables are `camelCase`. Constants are `UPPER_SNAKE_CASE` | MUST | `biome` |
 | NAM-03 | Names of domain concepts come from the [glossary](../glossary.md), spelled exactly | MUST | `review` |
 | NAM-04 | A use case file is named after the action: `approve-report.ts` exports `ApproveReport` | MUST | `review` |
-| NAM-05 | File suffix states the role: `.repository.ts`, `.mapper.ts`, `.routes.ts`, `.schemas.ts`, `.middleware.ts`, `.test.ts` | MUST | `review` |
+| NAM-05 | File suffix states the role: `.repository.ts`, `.mapper.ts`, `.routes.ts`, `.schemas.ts`, `.openapi.ts`, `.middleware.ts`, `.test.ts` | MUST | `review` |
 | NAM-06 | Database tables and columns are `snake_case`, mapped in `schema.prisma` | MUST | `review` |
 | NAM-07 | Error codes are `UPPER_SNAKE_CASE` and stable: `REPORT_VERSION_CONFLICT` | MUST | `review` |
 
@@ -79,6 +79,7 @@ Each rule has a code for citing in reviews. The **Check** column names what enfo
 | API-02 | Every `POST` and `PUT` requires an `Idempotency-Key` header | MUST | `review` |
 | API-03 | Every error response uses the shape defined in the architecture document | MUST | `review` |
 | API-04 | Responses for reports always include the current `version` | MUST | `review` |
+| API-05 | Every endpoint is described in its module's `interface/<name>.openapi.ts`, with request schemas generated from the route's Zod schemas and every error code it can return | MUST | `openapi.api.test.ts`, `review` |
 
 ## 7. Logging and configuration (LOG, CFG)
 

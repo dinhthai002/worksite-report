@@ -106,7 +106,7 @@ worksite-report/
 │   │       ├── domain/           aggregates, entities, value objects, repository ports
 │   │       ├── application/      one use case per file
 │   │       ├── infrastructure/   Prisma repositories, mappers
-│   │       ├── interface/        routes, Zod schemas
+│   │       ├── interface/        routes, Zod schemas, OpenAPI description
 │   │       └── index.ts          the module's public API
 │   │
 │   └── shared/
@@ -114,7 +114,8 @@ worksite-report/
 │       │                         progress, the user repository port
 │       └── infrastructure/       db.ts, system-clock.ts, logger.ts, Prisma repositories for
 │                                 users and request keys,
-│                                 http/ (middleware, error-handler.ts, health.routes.ts)
+│                                 http/ (middleware, error-handler.ts, health.routes.ts,
+│                                 openapi.ts, docs.routes.ts)
 │
 └── test/
     ├── setup.ts                  Testcontainers bootstrap (Jest globalSetup)
@@ -133,7 +134,15 @@ File names inside a module follow the coding standard: a use case file is named 
 
 ## 4. HTTP API
 
-Endpoints are defined per feature in `specs/NNN-name/contracts/`. The only endpoint that is not part of a feature is `GET /health`: a liveness and database check that needs no actor.
+Endpoints are defined per feature in `specs/NNN-name/contracts/`. The endpoints that are not part of a feature need no actor:
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Liveness and database check |
+| `GET /openapi.json` | The OpenAPI 3.1 description of every endpoint |
+| `GET /docs` | Swagger UI for that description. **Authorize** sets the actor headers; requests sent from it go through the normal checks |
+
+The description is built from the code (API-05). Each module describes its endpoints in `interface/<name>.openapi.ts` and exports the description through its `index.ts`; `app.ts` joins them with `buildOpenApiDocument` in `shared/infrastructure/http/openapi.ts`. Request parameters and bodies are generated from the same Zod schemas the routes validate with. Response schemas are written in Zod next to them, and `openapi.api.test.ts` checks real responses against them and checks that every route is described.
 
 ### 4.1 Conventions
 

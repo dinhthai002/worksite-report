@@ -317,7 +317,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | --- | --- |
 | `worksite/domain` | `Worksite.create`: the creating site supervisor becomes its supervisor. `addTask` and `reassign`: the assignee must be a foreman; only the worksite's supervisor may do it (BR-13) |
 | `worksite/application` | `CreateWorksite`, `AddTask`, `AssignTask` |
-| `worksite/interface` | `POST /worksites`, `POST /worksites/:worksiteId/tasks`, `PUT /tasks/:taskId/assignee`. All require `Idempotency-Key` |
+| `worksite/interface` | `POST /worksites`, `POST /worksites/:worksiteId/tasks`, `PUT /tasks/:taskId/assignee`. All require `Idempotency-Key`. Each is described in `worksite.openapi.ts` (API-05) |
 | Other | `http/report-flow.http`: creating a second worksite and reassigning a task |
 
 **Tests.**

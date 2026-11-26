@@ -17,7 +17,9 @@ docker compose up --build
 curl http://localhost:3000/health
 ```
 
-This starts PostgreSQL, applies migrations, loads the example data, and starts the API on port 3000. To walk through the main flow by hand, open `http/report-flow.http` in an editor with an HTTP client. It lists the user and worksite IDs to send.
+This starts PostgreSQL, applies migrations, loads the example data, and starts the API on port 3000. `npm run dev` serves the same API.
+
+The API is described at <http://localhost:3000/docs> (Swagger UI) and <http://localhost:3000/openapi.json>. In Swagger UI, use **Authorize** to set `X-Actor-Id` and `X-Actor-Role` as one of the example users, then **Try it out**; every write also needs a new `Idempotency-Key`. To walk through the main flow by hand instead, open `http/report-flow.http` in an editor with an HTTP client. It lists the user and worksite IDs to send.
 
 The example data is the townhouse from the PRD: Linda (site supervisor), Mark and Henry (foremen), and the "Three-storey townhouse" worksite with three tasks. Every start adds only the example rows that are missing and keeps existing data, so progress you change survives a restart. To put the example back to its PRD values, run `npx prisma db seed`, or `docker compose run --rm migrate node dist/prisma/seed.js --reset` without Node.js on the host.
 
