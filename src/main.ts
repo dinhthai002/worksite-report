@@ -4,6 +4,7 @@ import { PrismaDailyReportRepository, SaveDraft, SubmitReport } from "./modules/
 import { GetWorksite, PrismaWorksiteRepository } from "./modules/worksite";
 import { checkDatabase, createPrismaClient } from "./shared/infrastructure/db";
 import { createLogger, type Logger } from "./shared/infrastructure/logger";
+import { PrismaIdempotencyKeyRepository } from "./shared/infrastructure/prisma-idempotency-key.repository";
 import { PrismaUserRepository } from "./shared/infrastructure/prisma-user.repository";
 import { SystemClock } from "./shared/infrastructure/system-clock";
 
@@ -36,6 +37,7 @@ function main(): void {
     logger,
     checkDatabase: () => checkDatabase(prisma),
     users: new PrismaUserRepository(prisma),
+    idempotencyKeys: new PrismaIdempotencyKeyRepository(prisma),
     getWorksite: new GetWorksite(worksites),
     saveDraft: new SaveDraft(reports, worksites, clock, config.backdateLimitDays),
     submitReport: new SubmitReport(reports, worksites, clock),

@@ -5,6 +5,7 @@ import { GetWorksite, PrismaWorksiteRepository } from "@src/modules/worksite";
 import type { Clock } from "@src/shared/domain/clock";
 import { checkDatabase, type DatabaseClient } from "@src/shared/infrastructure/db";
 import { createLogger } from "@src/shared/infrastructure/logger";
+import { PrismaIdempotencyKeyRepository } from "@src/shared/infrastructure/prisma-idempotency-key.repository";
 import { PrismaUserRepository } from "@src/shared/infrastructure/prisma-user.repository";
 import type { Express } from "express";
 import { FixedClock } from "../fakes/fixed-clock";
@@ -34,6 +35,7 @@ export function createTestApp(
     logger: createLogger("silent"),
     checkDatabase: () => checkDatabase(client),
     users: new PrismaUserRepository(client),
+    idempotencyKeys: new PrismaIdempotencyKeyRepository(client),
     getWorksite: new GetWorksite(worksites),
     saveDraft: new SaveDraft(reports, worksites, clock, DEFAULT_BACKDATE_LIMIT_DAYS),
     submitReport: new SubmitReport(reports, worksites, clock),
