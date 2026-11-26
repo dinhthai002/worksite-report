@@ -77,29 +77,29 @@ There are two roles, and each user has exactly one, so the person who approves a
 
 ## Example: three-storey townhouse
 
-Lan is the site supervisor. The worksite has three tasks assigned to two foremen.
+Linda is the site supervisor. The worksite has three tasks assigned to two foremen.
 
 | Task | Assignee | Approved progress |
 | --- | --- | --- |
-| Pour foundation | Minh | 100% |
-| Build ground-floor walls | Minh | 40% |
-| Install electrical | Hung | 0% |
+| Pour foundation | Mark | 100% |
+| Build ground-floor walls | Mark | 40% |
+| Install electrical | Henry | 0% |
 
 At the end of 20 November, each foreman submits one report containing only the tasks worked on that day:
 
-- **Minh's report:** Build ground-floor walls at 55%. Pour foundation is not in the report because it is complete.
-- **Hung's report:** Install electrical at 10%.
+- **Mark's report:** Build ground-floor walls at 55%. Pour foundation is not in the report because it is complete.
+- **Henry's report:** Install electrical at 10%.
 
-Approved progress changes with each of Lan's decisions:
+Approved progress changes with each of Linda's decisions:
 
 | Point in time | Build ground-floor walls | Install electrical |
 | --- | --- | --- |
 | Both reports submitted, none approved | 40% | 0% |
-| Lan approves Minh's report | 55% | 0% |
-| Lan rejects Hung's report. Reason: conduit laid, no wiring pulled yet | 55% | 0% |
-| Hung changes the figure to 5% and resubmits. Lan approves | 55% | 5% |
+| Linda approves Mark's report | 55% | 0% |
+| Linda rejects Henry's report. Reason: conduit laid, no wiring pulled yet | 55% | 0% |
+| Henry changes the figure to 5% and resubmits. Linda approves | 55% | 5% |
 
-On 21 November, Minh cannot report Build ground-floor walls below 55%, and cannot report Install electrical because that task is assigned to Hung.
+On 21 November, Mark cannot report Build ground-floor walls below 55%, and cannot report Install electrical because that task is assigned to Henry.
 
 ## Implementation goals
 

@@ -98,7 +98,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | Layer | Work |
 | --- | --- |
 | Persistence | Prisma models and migration for `users` (id, name, role), `worksites` (id, name, supervisor, status `ACTIVE`/`CLOSED`) and `tasks` (id, worksite, name, assignee, `approved_progress` default 0). Hand-written `CHECK (approved_progress BETWEEN 0 AND 100)`. Tables and columns are `snake_case` (NAM-06) |
-| Seed | `prisma/seed.ts`: Lan (site supervisor), Minh and Hung (foremen), worksite "Three-storey townhouse" (`ACTIVE`, supervised by Lan), tasks Pour foundation (Minh, 100), Build ground-floor walls (Minh, 40), Install electrical (Hung, 0). Fixed UUIDs, idempotent upserts. The compose `migrate` service runs the seed after `migrate deploy` |
+| Seed | `prisma/seed.ts`: Linda (site supervisor), Mark and Henry (foremen), worksite "Three-storey townhouse" (`ACTIVE`, supervised by Linda), tasks Pour foundation (Mark, 100), Build ground-floor walls (Mark, 40), Install electrical (Henry, 0). Fixed UUIDs, idempotent upserts. The compose `migrate` service runs the seed after `migrate deploy` |
 | `shared/domain` | `Role` const object and type (glossary) |
 | `worksite/domain` | `Worksite` aggregate with `Task` entities, `WorksiteStatus`, branded `WorksiteId` and `TaskId`, `WorksiteRepository` port |
 | `worksite/application` | `GetWorksite` use case: returns the worksite with its tasks, or `NotFoundError` |
@@ -118,7 +118,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | Integration | Worksite mapper round trip: a saved worksite loads back equal |
 | Integration | `tasks.approved_progress` outside 0 to 100 is rejected by the database |
 | Integration | Running the seed twice leaves exactly one copy of each row |
-| API | `GET /worksites/:id` returns `200` with three tasks, for Lan and for Minh |
+| API | `GET /worksites/:id` returns `200` with three tasks, for Linda and for Mark |
 | API | Unknown worksite returns `404` |
 | API | Missing actor headers, an unknown user ID, or a role that does not match the stored role return `401` |
 | API | Unknown route returns `404 ROUTE_NOT_FOUND`; malformed JSON returns `400 MALFORMED_JSON`; `X-Request-Id` is echoed, or generated when missing or unsafe |
@@ -126,7 +126,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 **Exit criteria.**
 
 - [ ] The shared exit criteria in 1.1 are met.
-- [ ] After `docker compose up --build`, `GET /worksites/<townhouse id>` as Lan returns the three tasks with approved progress 100, 40 and 0.
+- [ ] After `docker compose up --build`, `GET /worksites/<townhouse id>` as Linda returns the three tasks with approved progress 100, 40 and 0.
 - [ ] `npm run test:int` runs at least one test, without `--passWithNoTests`.
 
 **Questions to settle in `/speckit-clarify`.**
@@ -159,7 +159,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | `shared/infrastructure/http` | `idempotency.middleware.ts`: claim-first idempotency for every `POST` and `PUT` (BR-14, API-02) |
 | `reporting/interface` | `report.routes.ts`: `PUT /worksites/:worksiteId/reports/:workDate`, `POST /reports/:reportId/submit`, `GET /reports/:reportId`. `report.schemas.ts`. Requests carry `version`; every report response includes the current `version` (API-04) |
 | Wiring | `main.ts` creates `SystemClock` from `APP_TIME_ZONE` and passes it and `BACKDATE_LIMIT_DAYS` to the use cases |
-| Other | `http/report-flow.http`: Minh drafts and submits his report for 20 November |
+| Other | `http/report-flow.http`: Mark drafts and submits his report for 20 November |
 
 **Tests.**
 
@@ -191,7 +191,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 
 - [ ] The shared exit criteria in 1.1 are met.
 - [ ] Every UC-1 acceptance criterion in use-cases.md has a passing test.
-- [ ] Using `http/report-flow.http`, Minh drafts "Build ground-floor walls" at 55% for 20 November, edits it, and submits it. Approved progress is still 40%.
+- [ ] Using `http/report-flow.http`, Mark drafts "Build ground-floor walls" at 55% for 20 November, edits it, and submits it. Approved progress is still 40%.
 
 **Questions to settle in `/speckit-clarify`.**
 
@@ -219,7 +219,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | `reporting/infrastructure` | The approval write, in one transaction (ADR 0004): update the report conditionally on `version` and `status = SUBMITTED`, then update each task with `WHERE approved_progress <= reported_progress`, then record the transition. Any failed condition rolls back everything (BR-9) |
 | `worksite/index.ts` | Exports what `reporting` needs to read: the worksite's supervisor and each task's approved progress |
 | `reporting/interface` | `POST /reports/:reportId/approve` with `version` in the body |
-| Other | `http/report-flow.http`: Lan approves Minh's report |
+| Other | `http/report-flow.http`: Linda approves Mark's report |
 
 **Tests.**
 
@@ -238,7 +238,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 
 - [ ] The shared exit criteria in 1.1 are met.
 - [ ] Every UC-3 acceptance criterion in use-cases.md has a passing test.
-- [ ] PRD example, row "Lan approves Minh's report": "Build ground-floor walls" becomes 55%, "Install electrical" stays 0%.
+- [ ] PRD example, row "Linda approves Mark's report": "Build ground-floor walls" becomes 55%, "Install electrical" stays 0%.
 
 **Questions to settle in `/speckit-clarify`.**
 
@@ -285,7 +285,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 
 - [ ] The shared exit criteria in 1.1 are met.
 - [ ] Every UC-4 acceptance criterion in use-cases.md has a passing test.
-- [ ] The PRD example passes as an API test, row by row: Minh and Hung submit; Lan approves Minh's report (walls 55%); Lan rejects Hung's report with the reason "conduit laid, no wiring pulled yet" (electrical stays 0%); Hung changes the figure to 5% and resubmits; Lan approves (electrical 5%).
+- [ ] The PRD example passes as an API test, row by row: Mark and Henry submit; Linda approves Mark's report (walls 55%); Linda rejects Henry's report with the reason "conduit laid, no wiring pulled yet" (electrical stays 0%); Henry changes the figure to 5% and resubmits; Linda approves (electrical 5%).
 - [ ] The same walkthrough works by hand with `http/report-flow.http` against `docker compose up --build`.
 - [ ] PRD implementation goals 1 to 3 (safe retries, no silent overwrites, atomic approval) each have a passing API or integration test.
 
