@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { reportRoutes, type SaveDraft, type SubmitReport } from "./modules/reporting";
 import { type GetWorksite, worksiteRoutes } from "./modules/worksite";
 import type { UserRepository } from "./shared/domain/user.repository";
 import { actorMiddleware } from "./shared/infrastructure/http/actor.middleware";
@@ -12,6 +13,8 @@ export interface AppDependencies {
   readonly checkDatabase: () => Promise<void>;
   readonly users: UserRepository;
   readonly getWorksite: GetWorksite;
+  readonly saveDraft: SaveDraft;
+  readonly submitReport: SubmitReport;
 }
 
 /** Builds the Express app without listening, so tests can drive it with supertest. */
@@ -28,6 +31,7 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use(actorMiddleware(dependencies.users));
 
   app.use(worksiteRoutes(dependencies.getWorksite));
+  app.use(reportRoutes({ saveDraft: dependencies.saveDraft, submitReport: dependencies.submitReport }));
 
   app.use(routeNotFound());
   app.use(errorHandler(dependencies.logger));

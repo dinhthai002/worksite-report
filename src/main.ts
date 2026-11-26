@@ -1,9 +1,11 @@
 import { createApp } from "./app";
 import { type Config, loadConfig } from "./config";
+import { PrismaDailyReportRepository, SaveDraft, SubmitReport } from "./modules/reporting";
 import { GetWorksite, PrismaWorksiteRepository } from "./modules/worksite";
 import { checkDatabase, createPrismaClient } from "./shared/infrastructure/db";
 import { createLogger, type Logger } from "./shared/infrastructure/logger";
 import { PrismaUserRepository } from "./shared/infrastructure/prisma-user.repository";
+import { SystemClock } from "./shared/infrastructure/system-clock";
 
 /** How long in-flight requests get to finish after SIGTERM before the process is forced to exit. */
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -26,12 +28,17 @@ function main(): void {
   }
   const logger = createLogger(config.logLevel);
   const prisma = createPrismaClient(config.databaseUrl);
+  const clock = new SystemClock(config.appTimeZone);
+  const worksites = new PrismaWorksiteRepository(prisma);
+  const reports = new PrismaDailyReportRepository(prisma);
 
   const app = createApp({
     logger,
     checkDatabase: () => checkDatabase(prisma),
     users: new PrismaUserRepository(prisma),
-    getWorksite: new GetWorksite(new PrismaWorksiteRepository(prisma)),
+    getWorksite: new GetWorksite(worksites),
+    saveDraft: new SaveDraft(reports, worksites, clock, config.backdateLimitDays),
+    submitReport: new SubmitReport(reports, worksites, clock),
   });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "listening");
