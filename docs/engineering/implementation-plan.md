@@ -261,23 +261,26 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 
 | Layer | Work |
 | --- | --- |
-| `reporting/domain` | `DailyReport.reject(reason)`: allowed only from `SUBMITTED` (BR-10); the reason is required (BR-8) and stored on the transition (BR-11) |
+| `reporting/domain` | `DailyReport.reject(reason)`: allowed only from `SUBMITTED` (BR-10); the reason is required (BR-8), checked after permission and status, and stored on the transition as sent (BR-11). BR-12 is one private check shared with `assertCanApprove`; rejection has its own code, `REPORT_REJECTION_FORBIDDEN` (004 research R2) |
 | `reporting/application` | `RejectReport`: only the worksite's site supervisor (BR-12). Editing and resubmitting reuse `SaveDraft` and `SubmitReport` on a `REJECTED` report |
-| `reporting/interface` | `POST /reports/:reportId/reject` with `version` and `reason` |
+| `reporting/infrastructure` | No new repository method: a rejection is stored with `save`, conditional on `version` (004 research R4). A migration adds two `CHECK`s on `report_transitions`: `reason` at most 2,000 characters, and a `REJECTED` transition has a non-blank reason (R5) |
+| `reporting/interface` | `POST /reports/:reportId/reject` with `version` and `reason`. A reason over 2,000 characters is a `400`; a missing, empty or blank one is `422 REJECTION_REASON_REQUIRED` |
 | Other | `http/report-flow.http` walks through the whole PRD example. README "Run it" matches what the file does |
 
 **Tests.**
 
 | Layer | Test |
 | --- | --- |
-| Unit | `BR-8` rejects a rejection with an empty or blank reason |
+| Unit | `BR-8` rejects a rejection with a missing, empty or blank reason, after permission, version and status |
 | Unit | `BR-10` an `APPROVED` report cannot be rejected |
 | Unit | `BR-6` the author can edit a `REJECTED` report; others cannot |
 | Unit | `BR-11` the rejection transition records actor, time and reason |
-| Unit | `BR-12` rejects rejection by a foreman and by the supervisor of another worksite |
+| Unit | `BR-12` rejects rejection by a foreman and by the supervisor of another worksite; rejecting a `DRAFT` gets exactly the same `403 REPORT_REJECTION_FORBIDDEN` |
 | Unit | TST-11 table updated, if the transition table changed |
 | Integration | `BR-15` approve and reject started together: exactly one succeeds |
+| Integration | `BR-8` the database refuses a `REJECTED` transition without a non-blank reason, and any reason over 2,000 characters |
 | API | `report-flow.api.test.ts`: UC-1 to UC-4 in sequence: draft, submit, reject, edit, resubmit, approve, then check task progress |
+| API | `concurrency.api.test.ts`: approve and reject at once, the loser always `409 REPORT_VERSION_CONFLICT`; a reason over 2,000 characters is a `400` |
 | API | `permissions.api.test.ts`: a foreman cannot approve or reject; a foreman cannot report on another foreman's task; a supervisor of another worksite cannot approve or reject |
 | API | Task progress does not change at any point before the final approval (UC-4 acceptance) |
 
@@ -291,8 +294,8 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 
 **Questions to settle in `/speckit-clarify`.**
 
-- Is there a maximum length for the rejection reason?
-- After a rejection, does the foreman see the reason through `GET /reports/:reportId` only, or also in the response of the next save?
+- Is there a maximum length for the rejection reason? Answered in 004 clarify: 2,000 characters, as for notes.
+- After a rejection, does the foreman see the reason through `GET /reports/:reportId` only, or also in the response of the next save? Answered: both; every response that returns the report carries its history with reasons.
 
 ---
 

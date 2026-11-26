@@ -21,7 +21,7 @@ This starts PostgreSQL, applies migrations, loads the example data, and starts t
 
 The example data is the townhouse from the PRD: Linda (site supervisor), Mark and Henry (foremen), and the "Three-storey townhouse" worksite with three tasks. Every start adds only the example rows that are missing and keeps existing data, so progress you change survives a restart. To put the example back to its PRD values, run `npx prisma db seed`, or `docker compose run --rm migrate node dist/prisma/seed.js --reset` without Node.js on the host.
 
-Reports are not part of the example data, and the walkthrough creates Mark's report for 20 November. To repeat the walkthrough from scratch, remove the data first with `docker compose down -v`, then start again.
+Reports are not part of the example data. The walkthrough creates Mark's and Henry's reports for 20 November and runs the whole PRD example: both foremen submit, Linda approves Mark's report, rejects Henry's with a reason, Henry corrects it and resubmits, and Linda approves it. To repeat the walkthrough from scratch, remove the data first with `docker compose down -v`, then start again.
 
 ## Develop
 

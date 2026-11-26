@@ -1,6 +1,7 @@
 # Manual walkthrough of the main flow (README.md, "Run it").
 # Start the stack with `docker compose up --build`, then send the requests in order.
-# Feature requests (draft, submit, reject, approve) are added here as each feature lands.
+# The requests run the whole PRD example, row by row: both foremen submit, Linda approves Mark's report, rejects
+# Henry's with a reason, Henry corrects and resubmits, and Linda approves it.
 #
 # Example data from the PRD (prisma/seed.ts). Responses show people by user ID only, so this is who is who:
 #
@@ -85,7 +86,32 @@ GET {{baseUrl}}/reports/{{reportId}}
 X-Actor-Id: {{linda}}
 X-Actor-Role: SITE_SUPERVISOR
 
-### Linda views the townhouse: Build ground-floor walls is still 40. Submitting changes no approved progress.
+# Henry reports on Install electrical for the same day (PRD example).
+@electrical = 00000000-0000-4000-8000-000000000203
+
+### Henry drafts Install electrical at 10%: 201, DRAFT, version 1.
+# @name henryDraft
+PUT {{baseUrl}}/worksites/{{townhouse}}/reports/2026-11-20
+X-Actor-Id: {{henry}}
+X-Actor-Role: FOREMAN
+Idempotency-Key: walkthrough-004-henry-draft
+Content-Type: application/json
+
+{ "items": [{ "taskId": "{{electrical}}", "reportedProgress": 10 }] }
+
+###
+@henryReportId = {{henryDraft.response.body.$.id}}
+
+### Henry submits from version 1: 200, SUBMITTED, version 2.
+POST {{baseUrl}}/reports/{{henryReportId}}/submit
+X-Actor-Id: {{henry}}
+X-Actor-Role: FOREMAN
+Idempotency-Key: walkthrough-004-henry-submit
+Content-Type: application/json
+
+{ "version": 1 }
+
+### PRD row "Both reports submitted, none approved": Linda views the townhouse. Walls still 40, electrical still 0.
 GET {{baseUrl}}/worksites/{{townhouse}}
 X-Actor-Id: {{linda}}
 X-Actor-Role: SITE_SUPERVISOR
@@ -107,7 +133,66 @@ GET {{baseUrl}}/reports/{{reportId}}
 X-Actor-Id: {{linda}}
 X-Actor-Role: SITE_SUPERVISOR
 
-### Linda views the townhouse: Build ground-floor walls is now 55, Install electrical still 0.
+### PRD row "Linda approves Mark's report": Linda views the townhouse. Walls is now 55, electrical still 0.
 GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+
+# ---------------------------------------------------------------------------------------------------
+# Feature 004: Linda rejects Henry's report; Henry reads the reason, corrects it and resubmits; Linda approves.
+
+### Linda rejects Henry's report from version 2, with a reason: 200, REJECTED, version 3.
+POST {{baseUrl}}/reports/{{henryReportId}}/reject
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+Idempotency-Key: walkthrough-004-reject
+Content-Type: application/json
+
+{ "version": 2, "reason": "conduit laid, no wiring pulled yet" }
+
+### PRD row "Linda rejects Henry's report": Linda views the townhouse. Walls 55, electrical still 0.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+
+### Henry views his report: REJECTED, version 3; the last transition carries Linda's reason.
+GET {{baseUrl}}/reports/{{henryReportId}}
+X-Actor-Id: {{henry}}
+X-Actor-Role: FOREMAN
+
+### Henry changes the figure to 5%, from version 3: 200, still REJECTED, version 4.
+PUT {{baseUrl}}/worksites/{{townhouse}}/reports/2026-11-20
+X-Actor-Id: {{henry}}
+X-Actor-Role: FOREMAN
+Idempotency-Key: walkthrough-004-henry-edit
+Content-Type: application/json
+
+{ "version": 3, "items": [{ "taskId": "{{electrical}}", "reportedProgress": 5 }] }
+
+### Henry resubmits from version 4: 200, SUBMITTED, version 5, a third transition REJECTED -> SUBMITTED.
+POST {{baseUrl}}/reports/{{henryReportId}}/submit
+X-Actor-Id: {{henry}}
+X-Actor-Role: FOREMAN
+Idempotency-Key: walkthrough-004-henry-resubmit
+Content-Type: application/json
+
+{ "version": 4 }
+
+### Linda approves Henry's report from version 5: 200, APPROVED, version 6.
+POST {{baseUrl}}/reports/{{henryReportId}}/approve
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+Idempotency-Key: walkthrough-004-approve-henry
+Content-Type: application/json
+
+{ "version": 5 }
+
+### PRD last row: Linda views the townhouse. Walls 55, electrical now 5.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+
+### Linda views Henry's report: four transitions, oldest first; the rejection keeps its reason.
+GET {{baseUrl}}/reports/{{henryReportId}}
 X-Actor-Id: {{linda}}
 X-Actor-Role: SITE_SUPERVISOR
