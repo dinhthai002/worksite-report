@@ -24,6 +24,7 @@ Read only the sections you need for the current step.
 | --- | --- |
 | `npm run check` | Typecheck, lint, architecture rules, unit tests. Run before reporting a task as done |
 | `npm run test:all` | Unit, integration, and API tests. Needs Docker |
+| `npm run audit` | High and critical advisories in production dependencies. Run after changing dependencies |
 | `npx prisma migrate dev --name <name>` | Create a migration after changing `schema.prisma` |
 | `docker compose up --build` | Run the whole application |
 

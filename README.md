@@ -44,6 +44,7 @@ If another PostgreSQL already uses port 5432, set `DB_PORT` in `.env` (for examp
 | `npm run dev` | Start the API with reload |
 | `npm run check` | Typecheck, lint, architecture rules, unit tests |
 | `npm run test:all` | Unit, integration, and API tests |
+| `npm run audit` | High and critical advisories in production dependencies, as in CI |
 | `npm run build` | Compile to `dist/` |
 
 ## Stack

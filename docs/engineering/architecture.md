@@ -254,7 +254,7 @@ The application runs with Docker Compose. One command starts everything: `docker
 One workflow on every push and pull request. All steps must pass.
 
 1. `npm ci`, whose `postinstall` runs `prisma generate`
-2. Audit: `npm audit --omit=dev --audit-level=high`
+2. Audit: `npm run audit`, which runs `npm audit --omit=dev --audit-level=high`
 3. Typecheck: `tsc --noEmit`
 4. Lint and format: `biome ci`
 5. Architecture: `depcruise src`

@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome ci .",
     "arch": "depcruise src",
+    "audit": "npm audit --omit=dev --audit-level=high",
     "check": "npm run typecheck && npm run lint && npm run arch && npm test",
     "test": "jest --selectProjects unit",
     "test:int": "jest --selectProjects integration --runInBand",

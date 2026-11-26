@@ -33,7 +33,7 @@ jobs:
       # Production dependencies only: dev tools never reach the image. package.json `overrides` patches
       # advisories in Prisma 6's own dependencies.
       - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
+        run: npm run audit
 
       - name: Typecheck
         run: npm run typecheck
