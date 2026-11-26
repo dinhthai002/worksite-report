@@ -29,11 +29,13 @@ services:
       timeout: 5s
       retries: 10
 
-  # Applies migrations once, then exits. The seed step is added together with the first models.
+  # Applies migrations, then fills in the PRD example rows that are missing (prisma/seed.ts, fill mode), then
+  # exits. Existing data is never changed. To reset the example: `npx prisma db seed`, or
+  # `docker compose run --rm migrate node dist/prisma/seed.js --reset`.
   migrate:
     build: .
     image: worksite-report:local
-    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+    command: ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/prisma/seed.js"]
     environment: *app-environment
     depends_on:
       db:

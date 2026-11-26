@@ -8,5 +8,5 @@
     "paths": {},
     "sourceMap": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "prisma/seed.ts"]
 }

@@ -1,8 +1,43 @@
 # Manual walkthrough of the main flow (README.md, "Run it").
 # Start the stack with `docker compose up --build`, then send the requests in order.
-# Feature requests (worksites, draft, submit, reject, approve) are added here as each feature lands.
+# Feature requests (draft, submit, reject, approve) are added here as each feature lands.
+#
+# Example data from the PRD (prisma/seed.ts). Responses show people by user ID only, so this is who is who:
+#
+# | User ID                              | Name  | Role            |
+# | ------------------------------------ | ----- | --------------- |
+# | 00000000-0000-4000-8000-000000000001 | Linda | SITE_SUPERVISOR |
+# | 00000000-0000-4000-8000-000000000002 | Mark  | FOREMAN         |
+# | 00000000-0000-4000-8000-000000000003 | Henry | FOREMAN         |
+#
+# Worksite "Three-storey townhouse": 00000000-0000-4000-8000-000000000101
+# Tasks: Pour foundation …0201 (Mark), Build ground-floor walls …0202 (Mark), Install electrical …0203 (Henry)
 
 @baseUrl = http://localhost:3000
+@linda = 00000000-0000-4000-8000-000000000001
+@mark = 00000000-0000-4000-8000-000000000002
+@henry = 00000000-0000-4000-8000-000000000003
+@townhouse = 00000000-0000-4000-8000-000000000101
 
 ### Liveness and database check. Needs no actor headers.
 GET {{baseUrl}}/health
+
+### Linda views the townhouse: all three tasks, approved progress 100, 40, 0.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+
+### Mark views the townhouse: only his two tasks.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{mark}}
+X-Actor-Role: FOREMAN
+
+### Henry views the townhouse: only Install electrical.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{henry}}
+X-Actor-Role: FOREMAN
+
+### Mark claiming the site supervisor role is refused with 401.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{mark}}
+X-Actor-Role: SITE_SUPERVISOR
