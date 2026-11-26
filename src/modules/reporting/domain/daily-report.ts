@@ -356,8 +356,11 @@ export class DailyReport {
     return this.with({ status: ReportStatus.SUBMITTED, transitions: [...this.transitions, transition] });
   }
 
-  // BR-6: only the author changes or submits a report.
-  private assertAuthor(actor: Actor): void {
+  /**
+   * BR-6: only the author changes or submits a report. Public so a use case can check it before comparing versions
+   * (research R4: permission for the report comes before the version).
+   */
+  assertAuthor(actor: Actor): void {
     if (actor.id !== this.authorId) {
       throw new ForbiddenError("NOT_REPORT_AUTHOR", `Only the author of report ${this.id} can change or submit it.`, {
         reportId: this.id,

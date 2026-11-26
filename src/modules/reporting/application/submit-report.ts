@@ -32,6 +32,8 @@ export class SubmitReport {
     if (report === undefined) {
       throw reportNotFound(input.reportId);
     }
+    // BR-6 before BR-15 (research R4): another foreman is refused as not permitted, not told the current version.
+    report.assertAuthor(input.actor);
     // BR-15: answer a stale copy before checking any rule; the repository's conditional write is the guard.
     if (report.version !== input.expectedVersion) {
       throw versionConflict(input.expectedVersion, report.version);

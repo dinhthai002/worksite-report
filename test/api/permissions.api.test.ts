@@ -69,4 +69,15 @@ describe("report permissions", () => {
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("NOT_REPORT_AUTHOR");
   });
+
+  it("BR-6 a foreman submitting another foreman's report from an old version is refused as not permitted", async () => {
+    const draft = await mark.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: WALLS, reportedProgress: 55 }] });
+    await mark.saveDraft(TOWNHOUSE, NOV_20, { version: 1, items: [{ taskId: WALLS, reportedProgress: 60 }] });
+
+    const response = await henry.submit(draft.body.id, { version: 1 });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("NOT_REPORT_AUTHOR");
+    expect(response.body.error.details).toEqual({ reportId: draft.body.id });
+  });
 });

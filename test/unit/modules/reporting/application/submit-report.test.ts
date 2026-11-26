@@ -10,6 +10,7 @@ import { aReport } from "../../../../support/daily-report.builder";
 import { aTask, aWorksite } from "../../../../support/worksite.builder";
 
 const MARK: Actor = { id: toUserId("00000000-0000-4000-8000-000000000002"), role: Role.FOREMAN };
+const HENRY: Actor = { id: toUserId("00000000-0000-4000-8000-000000000003"), role: Role.FOREMAN };
 const TOWNHOUSE = toWorksiteId("00000000-0000-4000-8000-000000000101");
 const WALLS = "00000000-0000-4000-8000-000000000202";
 const NOW = "2026-11-20T10:05:00Z";
@@ -113,6 +114,15 @@ describe("SubmitReport", () => {
 
     await expect(submitReport.execute({ actor: MARK, reportId: draft.id, expectedVersion: 1 })).rejects.toThrow(
       `Report ${draft.id} refers to missing worksite ${TOWNHOUSE}`,
+    );
+  });
+
+  it("BR-6 refuses another foreman before comparing the version", async () => {
+    const draft = marksDraft();
+    const { submitReport } = setUp(draft);
+
+    await expect(submitReport.execute({ actor: HENRY, reportId: draft.id, expectedVersion: 7 })).rejects.toThrow(
+      expect.objectContaining({ code: "NOT_REPORT_AUTHOR", details: { reportId: draft.id } }),
     );
   });
 });
