@@ -97,8 +97,8 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 
 | Layer | Work |
 | --- | --- |
-| Persistence | Prisma models and migration for `users` (id, name, role), `worksites` (id, name, supervisor, status `ACTIVE`/`CLOSED`) and `tasks` (id, worksite, name, assignee, `approved_progress` default 0). Hand-written `CHECK (approved_progress BETWEEN 0 AND 100)`. Tables and columns are `snake_case` (NAM-06) |
-| Seed | `prisma/seed.ts`: Linda (site supervisor), Mark and Henry (foremen), worksite "Three-storey townhouse" (`ACTIVE`, supervised by Linda), tasks Pour foundation (Mark, 100), Build ground-floor walls (Mark, 40), Install electrical (Henry, 0). Fixed UUIDs, idempotent upserts. The compose `migrate` service runs the seed after `migrate deploy` |
+| Persistence | Prisma models and migration for `users` (id, name, role), `worksites` (id, name, supervisor, status `ACTIVE`/`CLOSED`) and `tasks` (id, worksite, name, assignee, `approved_progress` default 0). Every table has `created_at` and `updated_at`, kept by the `set_updated_at()` trigger. Hand-written `CHECK (approved_progress BETWEEN 0 AND 100)`. Tables and columns are `snake_case` (NAM-06) |
+| Seed | `prisma/seed.ts`: Linda (site supervisor), Mark and Henry (foremen), worksite "Three-storey townhouse" (`ACTIVE`, supervised by Linda), tasks Pour foundation (Mark, 100), Build ground-floor walls (Mark, 40), Install electrical (Henry, 0). Fixed UUIDs. Two modes: fill (adds missing rows, changes nothing that exists), run by the compose `migrate` service after `migrate deploy`; reset (restores the PRD values), run by `npx prisma db seed` |
 | `shared/domain` | `Role` const object and type (glossary) |
 | `worksite/domain` | `Worksite` aggregate with `Task` entities, `WorksiteStatus`, branded `WorksiteId` and `TaskId`, `WorksiteRepository` port |
 | `worksite/application` | `GetWorksite` use case: returns the worksite with its tasks, or `NotFoundError` |
@@ -118,7 +118,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | Integration | Worksite mapper round trip: a saved worksite loads back equal |
 | Integration | `tasks.approved_progress` outside 0 to 100 is rejected by the database |
 | Integration | Running the seed twice leaves exactly one copy of each row |
-| API | `GET /worksites/:id` returns `200` with three tasks, for Linda and for Mark |
+| API | `GET /worksites/:id` returns `200` with three tasks for Linda, two for Mark and one for Henry |
 | API | Unknown worksite returns `404` |
 | API | Missing actor headers, an unknown user ID, or a role that does not match the stored role return `401` |
 | API | Unknown route returns `404 ROUTE_NOT_FOUND`; malformed JSON returns `400 MALFORMED_JSON`; `X-Request-Id` is echoed, or generated when missing or unsafe |

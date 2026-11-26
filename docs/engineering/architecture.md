@@ -181,6 +181,12 @@ A use case that changes more than one row does it in a single `$transaction` (DB
 
 `idempotency.middleware.ts` stores, per actor and request key, a hash of the request and the response that was returned. A repeated key with the same hash replays the stored response. A repeated key with a different hash is rejected with `422`.
 
+### 5.5 Timestamps and list order
+
+Every table has `created_at` and `updated_at`, both `timestamptz` and defaulting to `now()`. `updated_at` is maintained by the database: the trigger function `set_updated_at()` runs `BEFORE UPDATE` on each table, so no write path can skip it. A feature that adds a table adds both columns and the trigger in its migration.
+
+Lists are ordered by `updated_at` descending (most recently changed first), then `created_at` ascending, then `id`, so the order is the same on every request for the same data.
+
 ## 6. Request flow
 
 Every request that changes state goes through the same path:
@@ -214,7 +220,7 @@ The application runs with Docker Compose. One command starts everything: `docker
 | Service | Image | Role |
 | --- | --- | --- |
 | `db` | `postgres:17` | Database, with a named volume and a `pg_isready` healthcheck |
-| `migrate` | Application image | Runs `prisma migrate deploy`, and the seed once there is one, then exits. Starts after `db` is healthy |
+| `migrate` | Application image | Runs `prisma migrate deploy`, then the seed in fill mode (adds missing example rows, changes nothing that exists), then exits. Starts after `db` is healthy |
 | `api` | Application image | Runs the HTTP server. Starts after `migrate` completes successfully. Healthcheck on `GET /health` |
 
 - The `Dockerfile` is multi-stage: a build stage compiles TypeScript and generates the Prisma client, and a runtime stage contains only production dependencies and the compiled output, running as a non-root user.
