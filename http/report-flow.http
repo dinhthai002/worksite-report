@@ -89,3 +89,25 @@ X-Actor-Role: SITE_SUPERVISOR
 GET {{baseUrl}}/worksites/{{townhouse}}
 X-Actor-Id: {{linda}}
 X-Actor-Role: SITE_SUPERVISOR
+
+# ---------------------------------------------------------------------------------------------------
+# Feature 003: Linda approves Mark's report (PRD example, row "Linda approves Mark's report").
+
+### Linda approves Mark's report from version 3: 200, APPROVED, version 4, a second transition SUBMITTED -> APPROVED.
+POST {{baseUrl}}/reports/{{reportId}}/approve
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+Idempotency-Key: walkthrough-003-approve
+Content-Type: application/json
+
+{ "version": 3 }
+
+### Linda views the approved report: APPROVED, version 4, both transitions oldest first.
+GET {{baseUrl}}/reports/{{reportId}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+
+### Linda views the townhouse: Build ground-floor walls is now 55, Install electrical still 0.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR

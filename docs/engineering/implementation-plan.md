@@ -216,8 +216,8 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | --- | --- |
 | `reporting/domain` | `DailyReport.approve()`: allowed only from `SUBMITTED` (BR-10), records the transition (BR-11) |
 | `reporting/application` | `ApproveReport`: loads the report and its worksite through `worksite/index.ts`; rejects anyone but the worksite's site supervisor (BR-12); fails fast if a task's approved progress is already higher (BR-5) |
-| `reporting/infrastructure` | The approval write, in one transaction (ADR 0004): update the report conditionally on `version` and `status = SUBMITTED`, then update each task with `WHERE approved_progress <= reported_progress`, then record the transition. Any failed condition rolls back everything (BR-9) |
-| `worksite/index.ts` | Exports what `reporting` needs to read: the worksite's supervisor and each task's approved progress |
+| `reporting/infrastructure` | The approval write, in one transaction (ADR 0004): update the report conditionally on `version` and `status = SUBMITTED`, then raise each task, in ascending task ID order so concurrent approvals cannot deadlock, with `WHERE approved_progress < reported_progress`, and fail if a task not raised is above the reported progress; then record the transition. Any failed condition rolls back everything (BR-9). A task already at the reported value is not written, so it keeps its place in the worksite's list. Together the two conditions accept exactly the tasks ADR 0004's `<=` accepts (003 research R4) |
+| `worksite/index.ts` | Exports what `reporting` needs to read: the worksite's supervisor and each task's approved progress. Already satisfied by feature 002; no change (003 research R7) |
 | `reporting/interface` | `POST /reports/:reportId/approve` with `version` in the body |
 | Other | `http/report-flow.http`: Linda approves Mark's report |
 
@@ -226,13 +226,13 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | Layer | Test |
 | --- | --- |
 | Unit | `BR-10` an `APPROVED` report cannot be approved again, edited or submitted |
-| Unit | `BR-12` rejects approval by a foreman and by the supervisor of another worksite |
-| Unit | `BR-5` rejects approval when a task's approved progress is already above the reported progress |
+| Unit | `BR-12` rejects approval by a foreman and by the supervisor of another worksite; approving a `DRAFT` gets exactly the same `403` |
+| Unit | `BR-5` rejects approval when a task's approved progress is already above the reported progress, listing every such task with both figures |
 | Integration | `BR-9` approval where one task's progress is already higher rolls back: the report stays `SUBMITTED` and no task changes (UC-3 acceptance) |
 | Integration | `BR-15` two approvals of the same report started together: exactly one succeeds (UC-3 acceptance) |
 | Integration | `BR-5` reports approved out of date order: approving the 19th at 40% after the 20th at 60% fails |
 | API | Approval returns the new `version` and the tasks show the reported progress as approved progress |
-| API | A foreman, and the supervisor of another worksite, get `403` (UC-3 acceptance); a stale `version` gets `409`; a repeated `Idempotency-Key` replays the response |
+| API | A foreman, and the supervisor of another worksite, get `403` (UC-3 acceptance); a stale `version` gets `409`; of two approvals at once, the loser always gets `409 REPORT_VERSION_CONFLICT`; a body with a comment gets `400`; a repeated `Idempotency-Key` replays the response |
 
 **Exit criteria.**
 
