@@ -1,15 +1,7 @@
 import { type Actor, Role, type UserId } from "../../../shared/domain/actor";
 import { assertNever } from "../../../shared/domain/assert-never";
+import type { WorksiteId } from "../../../shared/domain/ids";
 import type { Task } from "./task";
-
-declare const worksiteIdBrand: unique symbol;
-
-/** ID of a worksite (TS-08). */
-export type WorksiteId = string & { readonly [worksiteIdBrand]: true };
-
-export function toWorksiteId(value: string): WorksiteId {
-  return value as WorksiteId;
-}
 
 /** Status of a worksite (glossary). Reports can be created only for an ACTIVE worksite (BR-3, feature 002). */
 export const WorksiteStatus = {

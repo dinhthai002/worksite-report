@@ -1,20 +1,12 @@
 import type { UserId } from "../../../shared/domain/actor";
-
-declare const taskIdBrand: unique symbol;
-
-/** ID of a task (TS-08). */
-export type TaskId = string & { readonly [taskIdBrand]: true };
-
-export function toTaskId(value: string): TaskId {
-  return value as TaskId;
-}
+import type { TaskId } from "../../../shared/domain/ids";
+import type { Progress } from "../../../shared/domain/progress";
 
 export interface TaskProps {
   readonly id: TaskId;
   readonly name: string;
   readonly assigneeId: UserId;
-  /** 0 to 100. The database guards the range until feature 002 introduces the Progress value object. */
-  readonly approvedProgress: number;
+  readonly approvedProgress: Progress;
 }
 
 /** A unit of construction work within a worksite (glossary). Reached through its Worksite. */
@@ -22,7 +14,7 @@ export class Task {
   readonly id: TaskId;
   readonly name: string;
   readonly assigneeId: UserId;
-  readonly approvedProgress: number;
+  readonly approvedProgress: Progress;
 
   private constructor(props: TaskProps) {
     this.id = props.id;

@@ -1,6 +1,6 @@
-import { toWorksiteId } from "@src/modules/worksite/domain/worksite";
 import { PrismaWorksiteRepository } from "@src/modules/worksite/infrastructure/prisma-worksite.repository";
 import { toUserId } from "@src/shared/domain/actor";
+import { toWorksiteId } from "@src/shared/domain/ids";
 import { createPrismaClient } from "@src/shared/infrastructure/db";
 import { insertTask, insertUser, insertWorksite, truncateAll } from "../support/database";
 import { aTask, aWorksite } from "../support/worksite.builder";

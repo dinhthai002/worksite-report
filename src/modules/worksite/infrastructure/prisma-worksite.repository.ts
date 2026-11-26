@@ -1,5 +1,6 @@
+import type { WorksiteId } from "../../../shared/domain/ids";
 import type { DatabaseClient } from "../../../shared/infrastructure/db";
-import type { Worksite, WorksiteId } from "../domain/worksite";
+import type { Worksite } from "../domain/worksite";
 import type { WorksiteRepository } from "../domain/worksite.repository";
 import { toWorksite } from "./worksite.mapper";
 

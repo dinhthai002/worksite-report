@@ -1,6 +1,7 @@
 import type { Actor } from "../../../shared/domain/actor";
 import { NotFoundError } from "../../../shared/domain/errors";
-import type { WorksiteId, WorksiteStatus } from "../domain/worksite";
+import type { WorksiteId } from "../../../shared/domain/ids";
+import type { WorksiteStatus } from "../domain/worksite";
 import type { WorksiteRepository } from "../domain/worksite.repository";
 
 export interface GetWorksiteInput {

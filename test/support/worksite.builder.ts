@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { Task, toTaskId } from "@src/modules/worksite/domain/task";
-import { toWorksiteId, Worksite, WorksiteStatus } from "@src/modules/worksite/domain/worksite";
+import { Task } from "@src/modules/worksite/domain/task";
+import { Worksite, WorksiteStatus } from "@src/modules/worksite/domain/worksite";
 import { toUserId, type UserId } from "@src/shared/domain/actor";
+import { toTaskId, toWorksiteId } from "@src/shared/domain/ids";
+import { type Progress, toProgress } from "@src/shared/domain/progress";
 
 /** Builds a Task with valid defaults (TST-10). */
 export class TaskBuilder {
   private id = toTaskId(randomUUID());
   private name = "Build ground-floor walls";
   private assigneeId: UserId = toUserId(randomUUID());
-  private approvedProgress = 0;
+  private approvedProgress: Progress = toProgress(0);
 
   withId(id: string): this {
     this.id = toTaskId(id);
@@ -26,7 +28,7 @@ export class TaskBuilder {
   }
 
   withApprovedProgress(approvedProgress: number): this {
-    this.approvedProgress = approvedProgress;
+    this.approvedProgress = toProgress(approvedProgress);
     return this;
   }
 

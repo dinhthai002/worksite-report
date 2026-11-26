@@ -1,5 +1,6 @@
-import type { Worksite, WorksiteId } from "@src/modules/worksite/domain/worksite";
+import type { Worksite } from "@src/modules/worksite/domain/worksite";
 import type { WorksiteRepository } from "@src/modules/worksite/domain/worksite.repository";
+import type { WorksiteId } from "@src/shared/domain/ids";
 
 /** In-memory WorksiteRepository for unit tests (TST-06). Keeps each worksite's task order as given. */
 export class InMemoryWorksiteRepository implements WorksiteRepository {

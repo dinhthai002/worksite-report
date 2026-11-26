@@ -1,8 +1,8 @@
 import { Router } from "express";
+import { toWorksiteId } from "../../../shared/domain/ids";
 import { currentActor } from "../../../shared/infrastructure/http/actor.middleware";
 import { withValidInput } from "../../../shared/infrastructure/http/validate-input.middleware";
 import type { GetWorksite } from "../application/get-worksite";
-import { toWorksiteId } from "../domain/worksite";
 import { getWorksiteParams } from "./worksite.schemas";
 
 /** Worksite endpoints. Handlers parse, call one use case, and map the result (ARC-07). */

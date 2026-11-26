@@ -1,7 +1,7 @@
 import { GetWorksite } from "@src/modules/worksite/application/get-worksite";
-import { toWorksiteId } from "@src/modules/worksite/domain/worksite";
 import { type Actor, Role, toUserId } from "@src/shared/domain/actor";
 import { NotFoundError } from "@src/shared/domain/errors";
+import { toWorksiteId } from "@src/shared/domain/ids";
 import { InMemoryWorksiteRepository } from "../../../../fakes/in-memory-worksite.repository";
 import { aTask, aWorksite } from "../../../../support/worksite.builder";
 

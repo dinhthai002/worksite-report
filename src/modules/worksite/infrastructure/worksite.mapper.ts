@@ -1,8 +1,10 @@
 import type { Task as TaskRow, Worksite as WorksiteRow, WorksiteStatus as WorksiteStatusRow } from "@prisma/client";
 import { toUserId } from "../../../shared/domain/actor";
 import { assertNever } from "../../../shared/domain/assert-never";
-import { Task, toTaskId } from "../domain/task";
-import { toWorksiteId, Worksite, WorksiteStatus } from "../domain/worksite";
+import { toTaskId, toWorksiteId } from "../../../shared/domain/ids";
+import { toProgress } from "../../../shared/domain/progress";
+import { Task } from "../domain/task";
+import { Worksite, WorksiteStatus } from "../domain/worksite";
 
 export type WorksiteWithTasksRow = WorksiteRow & { readonly tasks: readonly TaskRow[] };
 
@@ -22,7 +24,8 @@ function toTask(row: TaskRow): Task {
     id: toTaskId(row.id),
     name: row.name,
     assigneeId: toUserId(row.assigneeId),
-    approvedProgress: row.approvedProgress,
+    // The tasks_approved_progress_range CHECK guarantees the range.
+    approvedProgress: toProgress(row.approvedProgress),
   });
 }
 

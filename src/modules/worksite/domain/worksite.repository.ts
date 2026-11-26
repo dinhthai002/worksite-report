@@ -1,4 +1,5 @@
-import type { Worksite, WorksiteId } from "./worksite";
+import type { WorksiteId } from "../../../shared/domain/ids";
+import type { Worksite } from "./worksite";
 
 /** Loads worksites with their tasks. No save until a feature writes worksites (feature 005). */
 export interface WorksiteRepository {

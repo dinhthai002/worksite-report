@@ -1,5 +1,5 @@
-import { toWorksiteId } from "@src/modules/worksite/domain/worksite";
 import { PrismaWorksiteRepository } from "@src/modules/worksite/infrastructure/prisma-worksite.repository";
+import { toWorksiteId } from "@src/shared/domain/ids";
 import { createPrismaClient } from "@src/shared/infrastructure/db";
 import { EXAMPLE, loadExample } from "../../prisma/seed";
 import { insertTask, insertUser, insertWorksite, truncateAll } from "../support/database";
