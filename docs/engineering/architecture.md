@@ -251,5 +251,15 @@ One workflow on every push and pull request. All steps must pass.
 5. Unit tests
 6. Integration and API tests, with PostgreSQL from Testcontainers
 7. `docker build`
+8. Trivy scan of the image for HIGH and CRITICAL vulnerabilities that have a fix. Report only until the Prisma 7 upgrade; then it fails the build
 
 `npm run check` runs steps 2 to 5 locally.
+
+Security checks outside the `ci` workflow:
+
+| What | Where | When |
+| --- | --- | --- |
+| `npm audit --omit=dev --audit-level=high` | `.github/workflows/audit.yml` | Weekly, or by hand. Never blocks a push |
+| Dependency updates for npm, GitHub Actions, Docker, Compose | `.github/dependabot.yml` | Weekly pull requests |
+
+All actions are pinned to a commit SHA, with the version in a comment.
