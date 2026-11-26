@@ -9,7 +9,7 @@ describe("loadConfig", () => {
     expect(config).toEqual({
       databaseUrl: DATABASE_URL,
       port: 3000,
-      backdateLimitDays: 5,
+      backdateLimitDays: 365,
       appTimeZone: "Asia/Ho_Chi_Minh",
       logLevel: "info",
     });

@@ -9,6 +9,9 @@ export const LOG_LEVELS = ["fatal", "error", "warn", "info", "debug", "trace", "
 
 export type LogLevel = (typeof LOG_LEVELS)[number];
 
+/** How many days back a report can be created when BACKDATE_LIMIT_DAYS is not set (BR-2; feature 002, research R16). */
+export const DEFAULT_BACKDATE_LIMIT_DAYS = 365;
+
 export interface Config {
   readonly databaseUrl: string;
   readonly port: number;
@@ -41,7 +44,7 @@ function isValidTimeZone(timeZone: string): boolean {
 const environmentSchema = z.object({
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/, error: "must be a postgresql:// connection string" }),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
-  BACKDATE_LIMIT_DAYS: z.coerce.number().int().min(0).default(5),
+  BACKDATE_LIMIT_DAYS: z.coerce.number().int().min(0).default(DEFAULT_BACKDATE_LIMIT_DAYS),
   APP_TIME_ZONE: z
     .string()
     .default("Asia/Ho_Chi_Minh")

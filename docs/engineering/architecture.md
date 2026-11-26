@@ -207,7 +207,7 @@ Read once at startup in `config.ts`, validated with Zod, and exposed as a read-o
 | --- | --- | --- |
 | `DATABASE_URL` | PostgreSQL connection string | none, required |
 | `PORT` | HTTP port | `3000` |
-| `BACKDATE_LIMIT_DAYS` | How many days back a report can be created (BR-2) | `5` |
+| `BACKDATE_LIMIT_DAYS` | How many days back a report can be created (BR-2) | `365` |
 | `APP_TIME_ZONE` | Time zone used to decide "today" (BR-2) | `Asia/Ho_Chi_Minh` |
 | `LOG_LEVEL` | pino log level | `info` |
 
