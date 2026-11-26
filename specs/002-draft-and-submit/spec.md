@@ -264,15 +264,17 @@ The plan lists four questions. Three are settled under Clarifications: whether a
 - **"The same content"** for a request key means the same action on the same report or worksite and work date, with the same body.
 - **A request is checked in this order**: identity, request format and request key, permission by role, existence of the worksite or report, permission for that report, then business rules. A caller who fails an earlier check learns nothing from a later one. Because a refused viewer is told "not permitted" rather than "not found" (Clarifications), a user may learn that a report identifier exists, but nothing of its content.
 
-### Conflicts between documents, stated for decision
+### Conflicts between documents, resolved
 
-- **UC-2's "Applies" line** lists BR-3 to BR-7, but not BR-11, BR-14 or BR-15. BR-11, BR-14 and BR-15 each say they apply to every transition or write, and the implementation plan applies them here. This spec applies them to submission. This is implementation plan question P4 for the product owner.
-- **Who may view a report** (FR-030) is implementation plan question P2. It is settled for this feature under Clarifications. It narrows the PRD Roles row "View worksites, tasks, and reports", so the product owner should record it in `docs/product/` (for example as a use case for viewing a report).
-- **The backdating limit** (FR-004, FR-037a): BR-2 in `use-cases.md` says "not more than 5 days before today", and architecture.md section 7 gives a default of 5. This spec makes the default 365 days (Clarifications). BR-2 also says the limit is configurable, so the rule's mechanism is unchanged; its number is not. `use-cases.md` must be changed by the product owner, in a separate approved edit, before this feature is merged. architecture.md is updated in this feature's commit series.
+These were stated for decision and settled by the product owner on 2026-11-26, in `docs(product)` commit 93912c8:
+
+- **UC-2's "Applies" line** now lists BR-11, BR-14 and BR-15 (implementation plan question P4), as do UC-3 and UC-4.
+- **Who may view a report** (FR-030) is UC-5 View a report, and the PRD Roles table says it (question P2).
+- **The backdating limit** (FR-004, FR-037a): BR-2 in `use-cases.md` now says 365 days.
 - **The walkthrough date** (FR-037): 20 November 2026 is inside the 365-day default until 20 November 2027. After that, the walkthrough needs a newer work date.
 
 ### Dependencies
 
 - Feature 001: users and roles, the identity check, worksites with status, tasks with assignee and approved progress, the example data, the shared error shape and the ordering rule.
 - The backdating limit and the time zone are configured values (glossary, Backdating limit).
-- Open product questions P2 and P4 (implementation plan, section 5), and the change to BR-2's number of days. `docs/product/` changes only through the product owner.
+- Open product questions P2 and P4 (implementation plan, section 5), and the change to BR-2's number of days: answered in `docs/product/` on 2026-11-26.

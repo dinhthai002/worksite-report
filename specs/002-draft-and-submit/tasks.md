@@ -251,7 +251,7 @@ tests (constitution, Development Workflow).
 
 **Independent Test**: draft and submit Mark's report, view it as Mark and as Linda (`200`), view the draft as Linda and the report as Henry (`403`), and an unknown ID (`404`).
 
-**⚠️ Gate**: before T045, the product owner has approved and committed the `docs(product)` change to the PRD Roles table ("View worksites, tasks, and reports") and a use case for viewing a report (spec FR-030, Conflicts between documents; constitution I). If it is not committed, stop and ask. Do not build FR-030 against the old PRD row.
+**Gate (met 2026-11-26, commit 93912c8)**: before T045, the product owner has approved and committed the `docs(product)` change to the PRD Roles table ("View worksites, tasks, and reports") and a use case for viewing a report (spec FR-030, Conflicts between documents; constitution I). If it is not committed, stop and ask. Do not build FR-030 against the old PRD row.
 
 - [ ] T045 [US4] In `daily-report.ts` add `assertViewableBy(actor, worksite)` (`// FR-030`, research R13): allowed for the author; allowed for `worksite.supervisorId === actor.id` unless the status is `DRAFT`; otherwise `ForbiddenError("REPORT_VIEW_FORBIDDEN", "You may not view this report. Only its author, and the worksite's site supervisor once it is submitted, may view it.", { reportId })`.
 - [ ] T046 [US4] In `daily-report.test.ts` add `describe("who may view")`: the author in every status; the worksite's Site Supervisor in `SUBMITTED`, `REJECTED`, `APPROVED` but not `DRAFT`; another Foreman and the Site Supervisor of another worksite in every status are refused.
@@ -265,7 +265,7 @@ tests (constitution, Development Workflow).
 
 ## Phase 7: Polish and cross-cutting concerns
 
-**⚠️ Merge gate**: before the feature is merged, `docs/product/` has the product owner's approved changes, in one `docs(product)` commit: the PRD Roles table and the viewing use case (Phase 6 gate); BR-2 in `use-cases.md` with 365 days instead of 5 (T004); and UC-2's "Applies" line listing BR-11, BR-14 and BR-15 (open question P4). Check them during T054. Until then the branch is not merged (constitution I).
+**Merge gate (met 2026-11-26, commit 93912c8)**: before the feature is merged, `docs/product/` has the product owner's approved changes, in one `docs(product)` commit: the PRD Roles table and the viewing use case (Phase 6 gate); BR-2 in `use-cases.md` with 365 days instead of 5 (T004); and UC-2's "Applies" line listing BR-11, BR-14 and BR-15 (open question P4). Check them during T054. Until then the branch is not merged (constitution I).
 
 - [ ] T050 [P] In `http/report-flow.http` add, after the existing requests, named requests using the same variables and a `@reportId` captured from the first response: Mark drafts walls at 55% for `2026-11-20`; Mark adds a note from version 1; Mark submits from version 2; Linda views the report; Linda views the townhouse (walls still 40). Each `PUT` and `POST` has its own `Idempotency-Key`, and a comment explains that repeating a request with the same key replays the first answer (FR-037).
 - [ ] T051 [P] In `README.md` "Run it", add: reports are not part of the example data, so to repeat the walkthrough from scratch run `docker compose down -v` first.

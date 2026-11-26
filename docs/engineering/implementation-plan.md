@@ -377,7 +377,7 @@ These need the product owner, because `docs/product/` and the glossary are chang
 | # | Question | Needed by |
 | --- | --- | --- |
 | P1 | use-cases.md has no use case for worksite setup (create worksite, add task, assign). Add one with acceptance criteria? | Step 5 |
-| P2 | use-cases.md has no use case for viewing a report and its history. Who may view a report? | Step 2 |
+| P2 | use-cases.md has no use case for viewing a report and its history. Who may view a report? Answered 2026-11-26: UC-5 View a report | Step 2 |
 | P3 | Nothing closes a worksite, but BR-3 depends on `CLOSED`. Add an action, or confirm it stays out of scope? | Step 2 |
-| P4 | BR-14 and BR-15 apply to every write, but UC-2 and UC-4 do not list them, and UC-3 lists only BR-15. Align the "Applies" lines? | Step 2 |
+| P4 | BR-14 and BR-15 apply to every write, but UC-2 and UC-4 do not list them, and UC-3 lists only BR-15. Align the "Applies" lines? Answered 2026-11-26: UC-2 to UC-4 list them | Step 2 |
 | P5 | The glossary has no entry for "User", although the PRD model has a `USER` entity. Add one? | Step 1 |
