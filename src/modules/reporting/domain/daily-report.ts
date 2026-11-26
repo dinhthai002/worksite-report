@@ -368,6 +368,24 @@ export class DailyReport {
     }
   }
 
+  /**
+   * FR-030, UC-5: the author may view the report in any status; the worksite's site supervisor once it is submitted;
+   * nobody else.
+   */
+  assertViewableBy(actor: Actor, worksite: ReportWorksite): void {
+    if (actor.id === this.authorId) {
+      return;
+    }
+    if (actor.id === worksite.supervisorId && this.status !== ReportStatus.DRAFT) {
+      return;
+    }
+    throw new ForbiddenError(
+      "REPORT_VIEW_FORBIDDEN",
+      "You may not view this report. Only its author, and the worksite's site supervisor once it is submitted, may view it.",
+      { reportId: this.id },
+    );
+  }
+
   private with(changes: Partial<DailyReportProps>): DailyReport {
     return new DailyReport({ ...this.props(), ...changes });
   }

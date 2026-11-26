@@ -1,4 +1,8 @@
-import type { DailyReport, ReportStatus } from "../domain/daily-report";
+import type { Actor } from "../../../shared/domain/actor";
+import { NotFoundError } from "../../../shared/domain/errors";
+import type { WorksiteRepository } from "../../worksite";
+import type { DailyReport, ReportId, ReportStatus } from "../domain/daily-report";
+import type { DailyReportRepository } from "../domain/daily-report.repository";
 
 /** A report item as the caller sees it. */
 export interface ReportItemView {
@@ -52,4 +56,37 @@ export function toReportView(report: DailyReport): ReportView {
       }),
     ),
   };
+}
+
+export function reportNotFound(reportId: ReportId): NotFoundError {
+  return new NotFoundError("REPORT_NOT_FOUND", `There is no report with ID ${reportId}.`, { reportId });
+}
+
+export interface GetReportInput {
+  readonly actor: Actor;
+  readonly reportId: ReportId;
+}
+
+/** UC-5 View a report: the report with its items and transitions, to whoever may view it (FR-030 to FR-033). */
+export class GetReport {
+  private readonly reports: DailyReportRepository;
+  private readonly worksites: WorksiteRepository;
+
+  constructor(reports: DailyReportRepository, worksites: WorksiteRepository) {
+    this.reports = reports;
+    this.worksites = worksites;
+  }
+
+  async execute(input: GetReportInput): Promise<ReportView> {
+    const report = await this.reports.findById(input.reportId);
+    if (report === undefined) {
+      throw reportNotFound(input.reportId);
+    }
+    const worksite = await this.worksites.findById(report.worksiteId);
+    if (worksite === undefined) {
+      throw new Error(`Report ${report.id} refers to missing worksite ${report.worksiteId}`);
+    }
+    report.assertViewableBy(input.actor, worksite);
+    return toReportView(report);
+  }
 }

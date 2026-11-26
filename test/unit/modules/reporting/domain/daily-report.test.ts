@@ -339,3 +339,45 @@ describe("submit", () => {
     );
   });
 });
+
+describe("who may view", () => {
+  const sam: Actor = { id: toUserId("00000000-0000-4000-8000-000000000009"), role: Role.SITE_SUPERVISOR };
+  const statusBuilders = {
+    DRAFT: () => aReport().by(MARK.id).build(),
+    SUBMITTED: () => aReport().by(MARK.id).submitted().build(),
+    REJECTED: () => aReport().by(MARK.id).rejected().build(),
+    APPROVED: () => aReport().by(MARK.id).approved().build(),
+  } as const;
+  const allStatuses = Object.keys(statusBuilders) as (keyof typeof statusBuilders)[];
+
+  it.each(allStatuses)("FR-030 the author may view a %s report", (status) => {
+    expect(() => statusBuilders[status]().assertViewableBy(MARK, townhouse())).not.toThrow();
+  });
+
+  it.each(["SUBMITTED", "REJECTED", "APPROVED"] as const)(
+    "FR-030 the worksite's site supervisor may view a %s report",
+    (status) => {
+      expect(() => statusBuilders[status]().assertViewableBy(LINDA, townhouse())).not.toThrow();
+    },
+  );
+
+  it("FR-030 the worksite's site supervisor may not view a DRAFT", () => {
+    expect(() => statusBuilders.DRAFT().assertViewableBy(LINDA, townhouse())).toThrow(
+      expect.objectContaining({ code: "REPORT_VIEW_FORBIDDEN" }),
+    );
+  });
+
+  it.each(allStatuses)("FR-030 another foreman may not view a %s report", (status) => {
+    const report = statusBuilders[status]();
+    expect(() => report.assertViewableBy(HENRY, townhouse())).toThrow(ForbiddenError);
+    expect(() => report.assertViewableBy(HENRY, townhouse())).toThrow(
+      expect.objectContaining({ code: "REPORT_VIEW_FORBIDDEN", details: { reportId: report.id } }),
+    );
+  });
+
+  it.each(allStatuses)("FR-030 the site supervisor of another worksite may not view a %s report", (status) => {
+    expect(() => statusBuilders[status]().assertViewableBy(sam, townhouse())).toThrow(
+      expect.objectContaining({ code: "REPORT_VIEW_FORBIDDEN" }),
+    );
+  });
+});

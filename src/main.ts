@@ -1,6 +1,6 @@
 import { createApp } from "./app";
 import { type Config, loadConfig } from "./config";
-import { PrismaDailyReportRepository, SaveDraft, SubmitReport } from "./modules/reporting";
+import { GetReport, PrismaDailyReportRepository, SaveDraft, SubmitReport } from "./modules/reporting";
 import { GetWorksite, PrismaWorksiteRepository } from "./modules/worksite";
 import { checkDatabase, createPrismaClient } from "./shared/infrastructure/db";
 import { createLogger, type Logger } from "./shared/infrastructure/logger";
@@ -41,6 +41,7 @@ function main(): void {
     getWorksite: new GetWorksite(worksites),
     saveDraft: new SaveDraft(reports, worksites, clock, config.backdateLimitDays),
     submitReport: new SubmitReport(reports, worksites, clock),
+    getReport: new GetReport(reports, worksites),
   });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "listening");

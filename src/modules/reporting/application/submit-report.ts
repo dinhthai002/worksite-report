@@ -1,10 +1,9 @@
 import type { Actor } from "../../../shared/domain/actor";
 import type { Clock } from "../../../shared/domain/clock";
-import { NotFoundError } from "../../../shared/domain/errors";
 import type { WorksiteRepository } from "../../worksite";
 import { DailyReport, type ReportId } from "../domain/daily-report";
 import type { DailyReportRepository } from "../domain/daily-report.repository";
-import { type ReportView, toReportView } from "./get-report";
+import { type ReportView, reportNotFound, toReportView } from "./get-report";
 import { versionConflict } from "./save-draft";
 
 export interface SubmitReportInput {
@@ -45,8 +44,4 @@ export class SubmitReport {
     const submitted = report.submit(input.actor, worksite, this.clock.now());
     return toReportView(await this.reports.save(submitted, input.expectedVersion));
   }
-}
-
-export function reportNotFound(reportId: ReportId): NotFoundError {
-  return new NotFoundError("REPORT_NOT_FOUND", `There is no report with ID ${reportId}.`, { reportId });
 }

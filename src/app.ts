@@ -1,5 +1,5 @@
 import express, { type Express } from "express";
-import { reportRoutes, type SaveDraft, type SubmitReport } from "./modules/reporting";
+import { type GetReport, reportRoutes, type SaveDraft, type SubmitReport } from "./modules/reporting";
 import { type GetWorksite, worksiteRoutes } from "./modules/worksite";
 import type { UserRepository } from "./shared/domain/user.repository";
 import { actorMiddleware } from "./shared/infrastructure/http/actor.middleware";
@@ -20,6 +20,7 @@ export interface AppDependencies {
   readonly getWorksite: GetWorksite;
   readonly saveDraft: SaveDraft;
   readonly submitReport: SubmitReport;
+  readonly getReport: GetReport;
 }
 
 /** Builds the Express app without listening, so tests can drive it with supertest. */
@@ -38,7 +39,13 @@ export function createApp(dependencies: AppDependencies): Express {
   app.use(idempotencyMiddleware(dependencies.idempotencyKeys));
 
   app.use(worksiteRoutes(dependencies.getWorksite));
-  app.use(reportRoutes({ saveDraft: dependencies.saveDraft, submitReport: dependencies.submitReport }));
+  app.use(
+    reportRoutes({
+      saveDraft: dependencies.saveDraft,
+      submitReport: dependencies.submitReport,
+      getReport: dependencies.getReport,
+    }),
+  );
 
   app.use(routeNotFound());
   app.use(errorHandler(dependencies.logger));
