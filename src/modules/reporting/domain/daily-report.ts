@@ -380,19 +380,59 @@ export class DailyReport {
     return this.with({ status: ReportStatus.SUBMITTED, transitions: [...this.transitions, transition] });
   }
 
-  /**
-   * BR-12: only the site supervisor of the report's worksite approves it. A DRAFT gets the same answer (FR-009): the
-   * supervisor may not see drafts (FR-030), so approving one must not reveal that it is a draft.
-   */
+  /** BR-12 for approval: see assertDecidableBy. */
   assertCanApprove(actor: Actor, worksite: ReportWorksite): void {
-    const isTheSupervisor = actor.role === Role.SITE_SUPERVISOR && actor.id === worksite.supervisorId;
-    if (!isTheSupervisor || this.status === ReportStatus.DRAFT) {
-      throw new ForbiddenError(
-        "REPORT_APPROVAL_FORBIDDEN",
-        "You may not approve this report. Only the site supervisor of its worksite may approve it, once it is submitted.",
-        { reportId: this.id },
+    this.assertDecidableBy(
+      actor,
+      worksite,
+      () =>
+        new ForbiddenError(
+          "REPORT_APPROVAL_FORBIDDEN",
+          "You may not approve this report. Only the site supervisor of its worksite may approve it, once it is submitted.",
+          { reportId: this.id },
+        ),
+    );
+  }
+
+  /** BR-12 for rejection: see assertDecidableBy. */
+  assertCanReject(actor: Actor, worksite: ReportWorksite): void {
+    this.assertDecidableBy(
+      actor,
+      worksite,
+      () =>
+        new ForbiddenError(
+          "REPORT_REJECTION_FORBIDDEN",
+          "You may not reject this report. Only the site supervisor of its worksite may reject it, once it is submitted.",
+          { reportId: this.id },
+        ),
+    );
+  }
+
+  /**
+   * UC-4: the site supervisor rejects a SUBMITTED report with a reason. Records the transition with the reason as given,
+   * not trimmed (BR-11). No task changes. Neither the worksite's status (BR-3), the assignees (BR-4) nor approved
+   * progress (BR-5) are checked at rejection (FR-007): rejecting is how a report approval refuses is answered.
+   */
+  reject(actor: Actor, worksite: ReportWorksite, reason: string | null, at: Date): DailyReport {
+    this.assertCanReject(actor, worksite);
+    // BR-10: only a SUBMITTED report can be rejected; an APPROVED one is final.
+    assertTransition(this.status, ReportStatus.REJECTED);
+    // BR-8: rejecting requires a reason. Checked last, so a caller who may not reject learns nothing from it (FR-021).
+    if (reason === null || reason.trim() === "") {
+      throw new RuleViolationError(
+        "REJECTION_REASON_REQUIRED",
+        "A reason is required to reject a report. Say what its author needs to change.",
       );
     }
+    // BR-11: who, when, and why.
+    const transition: ReportTransition = {
+      from: this.status,
+      to: ReportStatus.REJECTED,
+      actorId: actor.id,
+      occurredAt: at,
+      reason,
+    };
+    return this.with({ status: ReportStatus.REJECTED, transitions: [...this.transitions, transition] });
   }
 
   /**
@@ -462,6 +502,18 @@ export class DailyReport {
       "You may not view this report. Only its author, and the worksite's site supervisor once it is submitted, may view it.",
       { reportId: this.id },
     );
+  }
+
+  /**
+   * BR-12: only the site supervisor of the report's worksite approves or rejects it. A DRAFT gets the same answer
+   * (FR-009 in 003, FR-008 in 004): the supervisor may not see drafts (FR-030), so deciding on one must not reveal that
+   * it is a draft. The rule is written once; each decision supplies its own refusal (004 research R2).
+   */
+  private assertDecidableBy(actor: Actor, worksite: ReportWorksite, refusal: () => ForbiddenError): void {
+    const isTheSupervisor = actor.role === Role.SITE_SUPERVISOR && actor.id === worksite.supervisorId;
+    if (!isTheSupervisor || this.status === ReportStatus.DRAFT) {
+      throw refusal();
+    }
   }
 
   private with(changes: Partial<DailyReportProps>): DailyReport {

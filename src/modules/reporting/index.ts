@@ -2,6 +2,7 @@
 
 export { ApproveReport } from "./application/approve-report";
 export { GetReport, type ReportView } from "./application/get-report";
+export { RejectReport } from "./application/reject-report";
 export { SaveDraft } from "./application/save-draft";
 export { SubmitReport } from "./application/submit-report";
 export { PrismaDailyReportRepository } from "./infrastructure/prisma-daily-report.repository";

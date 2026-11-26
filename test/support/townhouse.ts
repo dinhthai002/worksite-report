@@ -58,6 +58,12 @@ export class Caller {
       .send(body as object);
   }
 
+  reject(reportId: string, body: unknown, key: string = randomUUID()): request.Test {
+    return this.as(request(this.app).post(`/reports/${reportId}/reject`))
+      .set("Idempotency-Key", key)
+      .send(body as object);
+  }
+
   getReport(reportId: string): request.Test {
     return this.as(request(this.app).get(`/reports/${reportId}`));
   }

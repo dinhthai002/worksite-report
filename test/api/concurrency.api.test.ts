@@ -3,7 +3,17 @@ import type { Response } from "supertest";
 import { loadExample } from "../../prisma/seed";
 import { truncateAll } from "../support/database";
 import { createTestApp } from "../support/test-app";
-import { Caller, FOREMAN, LINDA, MARK, SITE_SUPERVISOR, TOWNHOUSE, WALLS } from "../support/townhouse";
+import {
+  Caller,
+  ELECTRICAL,
+  FOREMAN,
+  HENRY,
+  LINDA,
+  MARK,
+  SITE_SUPERVISOR,
+  TOWNHOUSE,
+  WALLS,
+} from "../support/townhouse";
 
 const databaseUrl: string | undefined = process.env.DATABASE_URL;
 if (databaseUrl === undefined) {
@@ -26,6 +36,7 @@ describe("concurrent writes", () => {
   const prisma = createPrismaClient(databaseUrl);
   const app = createTestApp(prisma);
   const mark = new Caller(app, MARK, FOREMAN);
+  const henry = new Caller(app, HENRY, FOREMAN);
   const linda = new Caller(app, LINDA, SITE_SUPERVISOR);
 
   beforeEach(async () => {
@@ -102,5 +113,54 @@ describe("concurrent writes", () => {
     expect(loser?.body.error.code).toBe("REPORT_VERSION_CONFLICT");
     expect(await prisma.reportTransition.count({ where: { reportId: draft.body.id, toStatus: "APPROVED" } })).toBe(1);
     expect((await prisma.task.findUniqueOrThrow({ where: { id: WALLS } })).approvedProgress).toBe(55);
+  });
+
+  /** Henry's report for 20 November, electrical at 10%, SUBMITTED at version 2. */
+  async function henrysSubmittedReport(): Promise<string> {
+    const draft = await henry.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: ELECTRICAL, reportedProgress: 10 }] });
+    await henry.submit(draft.body.id, { version: 1 });
+    return draft.body.id;
+  }
+
+  it("BR-15 approve and reject of one report from the same version: one 200, one 409", async () => {
+    const id = await henrysSubmittedReport();
+
+    const [approval, rejection] = settled(
+      await Promise.allSettled([
+        linda.approve(id, { version: 2 }),
+        linda.reject(id, { version: 2, reason: "conduit laid, no wiring pulled yet" }),
+      ]),
+    );
+
+    const statuses = [approval?.status, rejection?.status];
+    expect([...statuses].sort()).toEqual([200, 409]);
+    const loser = approval?.status === 409 ? approval : rejection;
+    // The version is checked before the status, so the loser is told to reload, never that the status forbids it.
+    expect(loser?.body.error.code).toBe("REPORT_VERSION_CONFLICT");
+    const view = await linda.getReport(id);
+    expect(view.body.transitions).toHaveLength(2);
+    const electrical = await prisma.task.findUniqueOrThrow({ where: { id: ELECTRICAL } });
+    if (approval?.status === 200) {
+      expect(view.body.status).toBe("APPROVED");
+      expect(electrical.approvedProgress).toBe(10);
+    } else {
+      expect(view.body.status).toBe("REJECTED");
+      expect(electrical.approvedProgress).toBe(0);
+    }
+  });
+
+  it("BR-15 two rejections of one report from the same version: one 200, one 409", async () => {
+    const id = await henrysSubmittedReport();
+
+    const responses = settled(
+      await Promise.allSettled([
+        linda.reject(id, { version: 2, reason: "conduit laid, no wiring pulled yet" }),
+        linda.reject(id, { version: 2, reason: "no wiring yet" }),
+      ]),
+    );
+
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409]);
+    expect(responses.find((response) => response.status === 409)?.body.error.code).toBe("REPORT_VERSION_CONFLICT");
+    expect(await prisma.reportTransition.count({ where: { reportId: id, toStatus: "REJECTED" } })).toBe(1);
   });
 });

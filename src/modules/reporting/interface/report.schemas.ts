@@ -45,3 +45,19 @@ export const submitReportBody = z.strictObject({ version: z.number().int().min(1
  * refused like any other unknown field (spec FR-015, Clarifications; research R6).
  */
 export const approveReportBody = z.strictObject({ version: z.number().int().min(1) });
+
+/** The longest rejection reason: the note limit (004 spec, Clarifications Q1). The database guards it too. */
+const REASON_MAX_LENGTH = 2000;
+
+/**
+ * POST /reports/:reportId/reject (004 contracts/reject-report.md). A missing or null reason is BR-8, decided in the
+ * domain after permission, version and status (004 Clarifications Q2); only the type and length are checked here.
+ */
+export const rejectReportBody = z.strictObject({
+  version: z.number().int().min(1),
+  reason: z
+    .string()
+    .max(REASON_MAX_LENGTH, `The reason must be at most ${REASON_MAX_LENGTH} characters.`)
+    .nullable()
+    .optional(),
+});

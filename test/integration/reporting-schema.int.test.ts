@@ -113,6 +113,57 @@ describe("reporting schema", () => {
 
       await expect(prisma.reportTransition.delete({ where: { id: transition.id } })).rejects.toThrow(/append-only/);
     });
+
+    it.each([
+      ["NULL", null],
+      ["empty", ""],
+      ["whitespace-only", " \t\n "],
+    ])("BR-8 rejects a REJECTED transition with a %s reason", async (_label, reason) => {
+      const report = await insertReport(prisma, { status: "REJECTED" });
+
+      await expect(
+        insertTransition(prisma, {
+          reportId: report.id,
+          actorId: report.authorId,
+          fromStatus: "SUBMITTED",
+          toStatus: "REJECTED",
+          reason,
+        }),
+      ).rejects.toThrow(/report_transitions_rejection_reason/);
+    });
+
+    it("BR-8 accepts a REJECTED transition with a reason, and a SUBMITTED transition with none", async () => {
+      const report = await insertReport(prisma, { status: "REJECTED" });
+
+      const submitted = await insertTransition(prisma, { reportId: report.id, actorId: report.authorId });
+      const rejected = await insertTransition(prisma, {
+        reportId: report.id,
+        actorId: report.authorId,
+        fromStatus: "SUBMITTED",
+        toStatus: "REJECTED",
+        reason: "conduit laid, no wiring pulled yet",
+      });
+
+      expect([submitted.reason, rejected.reason]).toEqual([null, "conduit laid, no wiring pulled yet"]);
+    });
+
+    it("rejects a reason of 2,001 characters and accepts 2,000", async () => {
+      const report = await insertReport(prisma, { status: "REJECTED" });
+      const rejection = {
+        reportId: report.id,
+        actorId: report.authorId,
+        fromStatus: "SUBMITTED",
+        toStatus: "REJECTED",
+      } as const;
+
+      await expect(insertTransition(prisma, { ...rejection, reason: "x".repeat(2001) })).rejects.toThrow(
+        /report_transitions_reason_length/,
+      );
+
+      const accepted = await insertTransition(prisma, { ...rejection, reason: "x".repeat(2000) });
+
+      expect(accepted.reason).toHaveLength(2000);
+    });
   });
 
   describe("idempotency_keys", () => {

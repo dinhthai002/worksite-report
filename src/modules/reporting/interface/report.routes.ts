@@ -4,16 +4,25 @@ import { currentActor } from "../../../shared/infrastructure/http/actor.middlewa
 import { withValidInput } from "../../../shared/infrastructure/http/validate-input.middleware";
 import type { ApproveReport } from "../application/approve-report";
 import type { GetReport } from "../application/get-report";
+import type { RejectReport } from "../application/reject-report";
 import type { SaveDraft } from "../application/save-draft";
 import type { SubmitReport } from "../application/submit-report";
 import { toReportId, toWorkDate } from "../domain/daily-report";
-import { approveReportBody, reportParams, saveDraftBody, saveDraftParams, submitReportBody } from "./report.schemas";
+import {
+  approveReportBody,
+  rejectReportBody,
+  reportParams,
+  saveDraftBody,
+  saveDraftParams,
+  submitReportBody,
+} from "./report.schemas";
 
 export interface ReportUseCases {
   readonly saveDraft: SaveDraft;
   readonly submitReport: SubmitReport;
   readonly getReport: GetReport;
   readonly approveReport: ApproveReport;
+  readonly rejectReport: RejectReport;
 }
 
 /** Daily report endpoints. Handlers parse, call one use case, and map the result (ARC-07). */
@@ -58,6 +67,19 @@ export function reportRoutes(useCases: ReportUseCases): Router {
         actor: currentActor(res),
         reportId: toReportId(params.reportId),
         expectedVersion: body.version,
+      });
+      res.status(200).json(report);
+    }),
+  );
+
+  router.post(
+    "/reports/:reportId/reject",
+    withValidInput({ params: reportParams, body: rejectReportBody }, async ({ params, body }, res): Promise<void> => {
+      const report = await useCases.rejectReport.execute({
+        actor: currentActor(res),
+        reportId: toReportId(params.reportId),
+        expectedVersion: body.version,
+        reason: body.reason ?? null,
       });
       res.status(200).json(report);
     }),

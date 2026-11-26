@@ -102,4 +102,82 @@ describe("report permissions", () => {
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe("REPORT_APPROVAL_FORBIDDEN");
   });
+
+  it("BR-12 a foreman cannot reject a report", async () => {
+    const draft = await mark.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: WALLS, reportedProgress: 55 }] });
+    await mark.submit(draft.body.id, { version: 1 });
+
+    const response = await henry.reject(draft.body.id, { version: 2, reason: "Not mine to judge." });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("REPORT_REJECTION_FORBIDDEN");
+  });
+
+  it("BR-12 a supervisor of another worksite cannot reject a report", async () => {
+    const draft = await mark.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: WALLS, reportedProgress: 55 }] });
+    await mark.submit(draft.body.id, { version: 1 });
+    const sam = await insertUser(prisma, { role: "SITE_SUPERVISOR" });
+    await insertWorksite(prisma, { supervisorId: sam.id });
+
+    const response = await new Caller(app, sam.id, SITE_SUPERVISOR).reject(draft.body.id, {
+      version: 2,
+      reason: "Not my worksite.",
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("REPORT_REJECTION_FORBIDDEN");
+  });
+
+  describe("a rejected report", () => {
+    async function henrysRejectedReport(): Promise<string> {
+      const draft = await henry.saveDraft(TOWNHOUSE, NOV_20, { items: [{ taskId: ELECTRICAL, reportedProgress: 10 }] });
+      await henry.submit(draft.body.id, { version: 1 });
+      const rejected = await linda.reject(draft.body.id, { version: 2, reason: "conduit laid, no wiring pulled yet" });
+      expect(rejected.status).toBe(200);
+      return draft.body.id;
+    }
+
+    async function statusAndVersion(id: string): Promise<{ status: string; version: number }> {
+      return prisma.dailyReport.findUniqueOrThrow({ where: { id }, select: { status: true, version: true } });
+    }
+
+    it("BR-6 a foreman cannot edit or submit another foreman's rejected report", async () => {
+      const id = await henrysRejectedReport();
+
+      const save = await mark.saveDraft(TOWNHOUSE, NOV_20, {
+        version: 3,
+        items: [{ taskId: ELECTRICAL, reportedProgress: 5 }],
+      });
+      const submit = await mark.submit(id, { version: 3 });
+
+      expect(submit.status).toBe(403);
+      expect(submit.body.error.code).toBe("NOT_REPORT_AUTHOR");
+      // A save addresses the caller's own report for the worksite and date, so Mark's PUT cannot reach Henry's report:
+      // Mark has none for 20 November. The domain refuses an edit by another foreman as NOT_REPORT_AUTHOR (unit test).
+      expect(save.status).toBe(409);
+      expect(save.body.error).toEqual(
+        expect.objectContaining({
+          code: "REPORT_VERSION_CONFLICT",
+          details: { expectedVersion: 3, currentVersion: null },
+        }),
+      );
+      expect(await statusAndVersion(id)).toEqual({ status: "REJECTED", version: 3 });
+    });
+
+    it("a site supervisor cannot edit or submit a rejected report", async () => {
+      const id = await henrysRejectedReport();
+
+      const save = await linda.saveDraft(TOWNHOUSE, NOV_20, {
+        version: 3,
+        items: [{ taskId: ELECTRICAL, reportedProgress: 5 }],
+      });
+      const submit = await linda.submit(id, { version: 3 });
+
+      for (const response of [save, submit]) {
+        expect(response.status).toBe(403);
+        expect(response.body.error.code).toBe("ROLE_CANNOT_AUTHOR_REPORTS");
+      }
+      expect(await statusAndVersion(id)).toEqual({ status: "REJECTED", version: 3 });
+    });
+  });
 });

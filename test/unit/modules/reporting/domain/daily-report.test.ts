@@ -572,3 +572,206 @@ describe("approve", () => {
     );
   });
 });
+
+describe("reject", () => {
+  const rejectedAt = new Date("2026-11-21T03:00:00Z");
+  const reason = "conduit laid, no wiring pulled yet";
+  const sam: Actor = { id: toUserId("00000000-0000-4000-8000-000000000009"), role: Role.SITE_SUPERVISOR };
+
+  function submittedByHenry(reportedProgress = 10): DailyReport {
+    return aReport()
+      .by(HENRY.id)
+      .withNote("Conduit only.")
+      .withItems({ taskId: ELECTRICAL, reportedProgress })
+      .submitted()
+      .build();
+  }
+
+  function refusalOf(attempt: () => unknown): unknown {
+    try {
+      attempt();
+    } catch (error) {
+      return error;
+    }
+    throw new Error("expected the attempt to be refused");
+  }
+
+  it("BR-11 rejecting records one transition SUBMITTED to REJECTED with the supervisor, the time and the reason", () => {
+    const report = submittedByHenry();
+
+    const rejected = report.reject(LINDA, townhouse(), reason, rejectedAt);
+
+    expect(rejected.status).toBe(ReportStatus.REJECTED);
+    expect(rejected.transitions).toEqual([
+      ...report.transitions,
+      { from: ReportStatus.SUBMITTED, to: ReportStatus.REJECTED, actorId: LINDA.id, occurredAt: rejectedAt, reason },
+    ]);
+    expect(rejected.items).toEqual(report.items);
+    expect(rejected.note).toBe(report.note);
+    expect(rejected.version).toBe(report.version);
+  });
+
+  it("BR-11 the reason is stored exactly as given, spaces included", () => {
+    const rejected = submittedByHenry().reject(LINDA, townhouse(), "  conduit laid  ", rejectedAt);
+
+    expect(rejected.transitions.at(-1)?.reason).toBe("  conduit laid  ");
+  });
+
+  it.each([
+    ["missing", null],
+    ["empty", ""],
+    ["spaces only", "   "],
+    ["tabs and newlines only", "\t\n"],
+  ])("BR-8 rejects a rejection without a reason: %s", (_label, blank) => {
+    const report = submittedByHenry();
+
+    expect(() => report.reject(LINDA, townhouse(), blank, rejectedAt)).toThrow(RuleViolationError);
+    expect(() => report.reject(LINDA, townhouse(), blank, rejectedAt)).toThrow(
+      expect.objectContaining({
+        code: "REJECTION_REASON_REQUIRED",
+        message: "A reason is required to reject a report. Say what its author needs to change.",
+      }),
+    );
+  });
+
+  it.each([
+    ["the author", HENRY],
+    ["another foreman", MARK],
+  ])("BR-12 rejects rejection by a foreman: %s", (_who, actor) => {
+    const report = submittedByHenry();
+
+    expect(() => report.reject(actor, townhouse(), reason, rejectedAt)).toThrow(ForbiddenError);
+    expect(() => report.reject(actor, townhouse(), reason, rejectedAt)).toThrow(
+      expect.objectContaining({ code: "REPORT_REJECTION_FORBIDDEN", details: { reportId: report.id } }),
+    );
+  });
+
+  it("BR-12 rejects rejection by a supervisor of another worksite", () => {
+    const report = submittedByHenry();
+
+    expect(() => report.reject(sam, townhouse(), reason, rejectedAt)).toThrow(
+      expect.objectContaining({
+        code: "REPORT_REJECTION_FORBIDDEN",
+        message:
+          "You may not reject this report. Only the site supervisor of its worksite may reject it, once it is submitted.",
+      }),
+    );
+  });
+
+  it("rejects rejection of a DRAFT with exactly the BR-12 refusal", () => {
+    const draft = aReport().by(HENRY.id).withItems({ taskId: ELECTRICAL, reportedProgress: 10 }).build();
+    const submitted = aReport()
+      .withId(draft.id)
+      .by(HENRY.id)
+      .withItems({ taskId: ELECTRICAL, reportedProgress: 10 })
+      .submitted()
+      .build();
+
+    const forDraft = refusalOf(() => draft.reject(LINDA, townhouse(), reason, rejectedAt));
+    const forOtherSupervisor = refusalOf(() => submitted.reject(sam, townhouse(), reason, rejectedAt));
+
+    expect(forDraft).toBeInstanceOf(ForbiddenError);
+    expect(forDraft).toEqual(forOtherSupervisor);
+    expect((forDraft as ForbiddenError).message).toBe((forOtherSupervisor as ForbiddenError).message);
+    expect((forDraft as ForbiddenError).details).toEqual((forOtherSupervisor as ForbiddenError).details);
+  });
+
+  it("BR-10 an APPROVED report cannot be rejected", () => {
+    const report = aReport().by(HENRY.id).withItems({ taskId: ELECTRICAL, reportedProgress: 10 }).approved().build();
+
+    expect(() => report.reject(LINDA, townhouse(), reason, rejectedAt)).toThrow(ConflictError);
+    expect(() => report.reject(LINDA, townhouse(), reason, rejectedAt)).toThrow(
+      expect.objectContaining({
+        code: "INVALID_STATUS_TRANSITION",
+        message: "A APPROVED report cannot be rejected. Only a SUBMITTED report can be.",
+        details: { from: "APPROVED", to: "REJECTED" },
+      }),
+    );
+  });
+
+  it("rejects rejecting a REJECTED report again, stating the status", () => {
+    const report = aReport().by(HENRY.id).withItems({ taskId: ELECTRICAL, reportedProgress: 10 }).rejected().build();
+
+    expect(() => report.reject(LINDA, townhouse(), reason, rejectedAt)).toThrow(
+      expect.objectContaining({ code: "INVALID_STATUS_TRANSITION", details: { from: "REJECTED", to: "REJECTED" } }),
+    );
+  });
+
+  it("BR-8 the reason is checked last: permission and status come first", () => {
+    const approved = aReport().by(HENRY.id).withItems({ taskId: ELECTRICAL, reportedProgress: 10 }).approved().build();
+
+    expect(() => submittedByHenry().reject(MARK, townhouse(), null, rejectedAt)).toThrow(
+      expect.objectContaining({ code: "REPORT_REJECTION_FORBIDDEN" }),
+    );
+    expect(() => approved.reject(LINDA, townhouse(), null, rejectedAt)).toThrow(
+      expect.objectContaining({ code: "INVALID_STATUS_TRANSITION" }),
+    );
+  });
+
+  it("FR-007 accepts a CLOSED worksite, a reassigned task, and a task whose approved progress is above the report", () => {
+    const report = submittedByHenry(10);
+    const worksite = aWorksite()
+      .supervisedBy(LINDA.id)
+      .closed()
+      .withTasks(
+        aTask().withId(ELECTRICAL).named("Install electrical").assignedTo(MARK.id).withApprovedProgress(20).build(),
+      )
+      .build();
+
+    expect(report.reject(LINDA, worksite, reason, rejectedAt).status).toBe(ReportStatus.REJECTED);
+  });
+});
+
+describe("after a rejection", () => {
+  const At = new Date("2026-11-21T04:00:00Z");
+  const reason = "conduit laid, no wiring pulled yet";
+
+  function rejectedByLinda(): DailyReport {
+    return aReport()
+      .by(HENRY.id)
+      .withItems({ taskId: ELECTRICAL, reportedProgress: 10 })
+      .submitted()
+      .build()
+      .reject(LINDA, townhouse(), reason, new Date("2026-11-21T03:00:00Z"));
+  }
+
+  it("BR-6 the author can edit a REJECTED report, which stays REJECTED with its rejection", () => {
+    const report = rejectedByLinda();
+
+    const edited = report.edit(HENRY, townhouse(), content({ taskId: ELECTRICAL, reportedProgress: 5 }));
+
+    expect(edited.status).toBe(ReportStatus.REJECTED);
+    expect(edited.items[0]?.reportedProgress).toBe(5);
+    expect(edited.transitions).toEqual(report.transitions);
+  });
+
+  it("BR-6 another foreman and a site supervisor cannot edit a REJECTED report", () => {
+    const report = rejectedByLinda();
+
+    expect(() => report.edit(MARK, townhouse(), content())).toThrow(
+      expect.objectContaining({ code: "NOT_REPORT_AUTHOR" }),
+    );
+    expect(() => report.edit(LINDA, townhouse(), content())).toThrow(
+      expect.objectContaining({ code: "ROLE_CANNOT_AUTHOR_REPORTS" }),
+    );
+  });
+
+  it.each([
+    ["edited", true],
+    ["unedited", false],
+  ])("BR-6 the author can submit a REJECTED report, %s, after the rejection", (_label, editFirst) => {
+    const rejected = rejectedByLinda();
+    const ready = editFirst
+      ? rejected.edit(HENRY, townhouse(), content({ taskId: ELECTRICAL, reportedProgress: 5 }))
+      : rejected;
+
+    const resubmitted = ready.submit(HENRY, townhouse(), At);
+
+    expect(resubmitted.status).toBe(ReportStatus.SUBMITTED);
+    expect(resubmitted.transitions.map((t) => [t.from, t.to, t.reason])).toEqual([
+      [ReportStatus.DRAFT, ReportStatus.SUBMITTED, null],
+      [ReportStatus.SUBMITTED, ReportStatus.REJECTED, reason],
+      [ReportStatus.REJECTED, ReportStatus.SUBMITTED, null],
+    ]);
+  });
+});

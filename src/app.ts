@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import {
   type ApproveReport,
   type GetReport,
+  type RejectReport,
   reportRoutes,
   type SaveDraft,
   type SubmitReport,
@@ -28,6 +29,7 @@ export interface AppDependencies {
   readonly submitReport: SubmitReport;
   readonly getReport: GetReport;
   readonly approveReport: ApproveReport;
+  readonly rejectReport: RejectReport;
 }
 
 /** Builds the Express app without listening, so tests can drive it with supertest. */
@@ -52,6 +54,7 @@ export function createApp(dependencies: AppDependencies): Express {
       submitReport: dependencies.submitReport,
       getReport: dependencies.getReport,
       approveReport: dependencies.approveReport,
+      rejectReport: dependencies.rejectReport,
     }),
   );
 

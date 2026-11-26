@@ -1,6 +1,13 @@
 import { createApp } from "./app";
 import { type Config, loadConfig } from "./config";
-import { ApproveReport, GetReport, PrismaDailyReportRepository, SaveDraft, SubmitReport } from "./modules/reporting";
+import {
+  ApproveReport,
+  GetReport,
+  PrismaDailyReportRepository,
+  RejectReport,
+  SaveDraft,
+  SubmitReport,
+} from "./modules/reporting";
 import { GetWorksite, PrismaWorksiteRepository } from "./modules/worksite";
 import { checkDatabase, createPrismaClient } from "./shared/infrastructure/db";
 import { createLogger, type Logger } from "./shared/infrastructure/logger";
@@ -43,6 +50,7 @@ function main(): void {
     submitReport: new SubmitReport(reports, worksites, clock),
     getReport: new GetReport(reports, worksites),
     approveReport: new ApproveReport(reports, worksites, clock),
+    rejectReport: new RejectReport(reports, worksites, clock),
   });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "listening");

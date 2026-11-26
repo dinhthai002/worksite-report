@@ -516,4 +516,79 @@ describe("PrismaDailyReportRepository.saveApproval", () => {
     expect(firstRow.approvedProgress).toBe(approvedB ? 40 : 30);
     expect(secondRow.approvedProgress).toBe(approvedA ? 70 : 60);
   });
+
+  describe("save, rejecting (004)", () => {
+    const Reason = "conduit laid, no wiring pulled yet";
+
+    /** What DailyReport.reject returns: REJECTED, with one more transition by the supervisor, carrying the reason. */
+    function rejectedBy(report: DailyReport, supervisorId: string): DailyReport {
+      return changed(report, {
+        status: ReportStatus.REJECTED,
+        transitions: [
+          ...report.transitions,
+          {
+            from: ReportStatus.SUBMITTED,
+            to: ReportStatus.REJECTED,
+            actorId: toUserId(supervisorId),
+            occurredAt: ApprovedAt,
+            reason: Reason,
+          },
+        ],
+      });
+    }
+
+    it("BR-11 saving a rejected report stores the transition with its reason and leaves the items untouched", async () => {
+      const site = await aSite();
+      const electrical = await aTaskAt(site, 0);
+      const report = await aSubmittedReport(site, "2026-11-20", [{ taskId: electrical, reportedProgress: 10 }]);
+      const itemBefore = await prisma.reportItem.findUniqueOrThrow({
+        where: { reportTask: { reportId: report.id, taskId: electrical } },
+      });
+
+      const stored = await reports.save(rejectedBy(report, site.supervisorId), report.version);
+
+      expect(stored.status).toBe(ReportStatus.REJECTED);
+      expect(stored.version).toBe(3);
+      const rows = await prisma.reportTransition.findMany({ where: { reportId: report.id, toStatus: "REJECTED" } });
+      expect(rows).toEqual([
+        expect.objectContaining({ fromStatus: "SUBMITTED", actorId: site.supervisorId, reason: Reason }),
+      ]);
+      const itemAfter = await prisma.reportItem.findUniqueOrThrow({
+        where: { reportTask: { reportId: report.id, taskId: electrical } },
+      });
+      expect(itemAfter.updatedAt).toEqual(itemBefore.updatedAt);
+      expect(await taskRow(electrical)).toEqual({ approvedProgress: 0, updatedAt: LONG_AGO });
+    });
+
+    it("BR-15 approve and reject started together: exactly one succeeds", async () => {
+      const site = await aSite();
+      const electrical = await aTaskAt(site, 0);
+      const report = await aSubmittedReport(site, "2026-11-20", [{ taskId: electrical, reportedProgress: 10 }]);
+
+      const [approval, rejection] = await Promise.allSettled([
+        reports.saveApproval(approvedBy(report, site.supervisorId), report.version),
+        reports.save(rejectedBy(report, site.supervisorId), report.version),
+      ]);
+
+      const outcomes = [approval, rejection];
+      expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+      const loser = outcomes.find((outcome) => outcome.status === "rejected");
+      expect(loser?.status === "rejected" ? loser.reason : undefined).toMatchObject({
+        code: "REPORT_VERSION_CONFLICT",
+        details: { currentVersion: 3 },
+      });
+      const decisions = await prisma.reportTransition.count({
+        where: { reportId: report.id, toStatus: { in: ["APPROVED", "REJECTED"] } },
+      });
+      expect(decisions).toBe(1);
+      const row = await prisma.dailyReport.findUniqueOrThrow({ where: { id: report.id } });
+      if (approval.status === "fulfilled") {
+        expect(row.status).toBe("APPROVED");
+        expect((await taskRow(electrical)).approvedProgress).toBe(10);
+      } else {
+        expect(row.status).toBe("REJECTED");
+        expect(await taskRow(electrical)).toEqual({ approvedProgress: 0, updatedAt: LONG_AGO });
+      }
+    });
+  });
 });
