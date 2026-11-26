@@ -18,13 +18,13 @@ Applies: BR-1, BR-2, BR-3, BR-4, BR-5 (range only), BR-14, BR-15.
 
 A foreman submits a draft or a rejected report for review.
 
-Applies: BR-3, BR-4, BR-5, BR-6, BR-7.
+Applies: BR-3, BR-4, BR-5, BR-6, BR-7, BR-11, BR-14, BR-15.
 
 ## UC-3: Approve a report
 
 The site supervisor reviews a submitted report and approves it.
 
-Applies: BR-5, BR-9, BR-10, BR-12, BR-15.
+Applies: BR-5, BR-9, BR-10, BR-11, BR-12, BR-14, BR-15.
 
 | Requirement | Bar | Verification |
 | --- | --- | --- |
@@ -36,12 +36,22 @@ Applies: BR-5, BR-9, BR-10, BR-12, BR-15.
 
 The site supervisor rejects a report with a reason. The foreman edits and resubmits.
 
-Applies: BR-6, BR-8, BR-11, BR-12.
+Applies: BR-6, BR-8, BR-11, BR-12, BR-14, BR-15.
 
 | Requirement | Bar | Verification |
 | --- | --- | --- |
 | Task progress does not change at any point in this flow | 0 tasks changed until the final approval | Compare progress after each step |
 | The foreman can see the reason, edit, and resubmit | Report returns to `SUBMITTED` | Run the full cycle: reject, edit, submit, approve |
+
+## UC-5: View a report
+
+A user views one daily report, its items, and its history of status changes.
+
+| Requirement | Bar | Verification |
+| --- | --- | --- |
+| The author can view their report in any status | Author: allowed | View as the author in each status |
+| The worksite's site supervisor can view it once submitted | Supervisor: refused for `DRAFT`, allowed otherwise | View before and after submission |
+| Nobody else can view it | Another foreman, a supervisor of another worksite: refused as not permitted | View as each of them |
 
 ## Business rules
 
@@ -52,7 +62,7 @@ Rule IDs are stable. Code and tests refer to rules by ID.
 | ID | Rule | On violation |
 | --- | --- | --- |
 | BR-1 | A foreman has at most one report per worksite per work date. | Return the existing report. Do not create a new one. |
-| BR-2 | The work date is not in the future and not more than 5 days before today. The limit is configurable, and "today" is evaluated in the system's configured time zone. | Reject, stating the valid date range. |
+| BR-2 | The work date is not in the future and not more than 365 days before today. The limit is configurable, and "today" is evaluated in the system's configured time zone. | Reject, stating the valid date range. |
 | BR-3 | Reports can be created and submitted only for an `ACTIVE` worksite. A report that was already `SUBMITTED` when the worksite was closed can still be approved or rejected. | Reject, stating that the worksite is closed. |
 | BR-4 | A task appears at most once in a report, belongs to the report's worksite, and is currently assigned to the report's author. Assignment is checked on save and on submit, not on approval: a `SUBMITTED` report can still be approved or rejected after one of its tasks is reassigned. | Reject, naming the offending task. |
 | BR-5 | Reported progress is an integer from 0 to 100 and is greater than or equal to the task's current approved progress. The reference is approved progress, not the previous day's report. | Reject, naming the task and its current approved progress. |
