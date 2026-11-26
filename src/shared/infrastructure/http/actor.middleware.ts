@@ -42,6 +42,18 @@ export function readActor(header: (name: string) => string | undefined): Actor {
   return { id: toUserId(parsed.data.id), role: parsed.data.role };
 }
 
+/**
+ * The actor that actorMiddleware stored for this request. Route handlers call it to pass the actor to a use case.
+ * Throws a plain Error (a 500) if the route was mounted before actorMiddleware: a wiring mistake, not a client one.
+ */
+export function currentActor(res: Pick<Response, "locals">): Actor {
+  const actor = res.locals.actor;
+  if (actor === undefined) {
+    throw new Error("currentActor called before actorMiddleware");
+  }
+  return actor;
+}
+
 /** Stores the actor in `res.locals.actor`, or passes UnauthenticatedError to the error handler. */
 export function actorMiddleware(): RequestHandler {
   return (req: Request, res: Response, next: NextFunction): void => {

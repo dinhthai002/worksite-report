@@ -1,4 +1,17 @@
-import { readActor, UnauthenticatedError } from "@src/shared/infrastructure/http/actor.middleware";
+import { type Actor, Role, toUserId } from "@src/shared/domain/actor";
+import { currentActor, readActor, UnauthenticatedError } from "@src/shared/infrastructure/http/actor.middleware";
+
+describe("currentActor", () => {
+  it("returns the actor stored by actorMiddleware", () => {
+    const actor: Actor = { id: toUserId("00000000-0000-4000-8000-000000000001"), role: Role.SITE_SUPERVISOR };
+
+    expect(currentActor({ locals: { actor } })).toBe(actor);
+  });
+
+  it("throws when no actor was stored, because the route is mounted before actorMiddleware", () => {
+    expect(() => currentActor({ locals: {} })).toThrow("currentActor called before actorMiddleware");
+  });
+});
 
 const ACTOR_ID = "7f8c1a52-3a4e-4a0e-9d55-0d8f9f6a2b11";
 

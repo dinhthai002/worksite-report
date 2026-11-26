@@ -1,5 +1,6 @@
 import { createApp } from "./app";
 import { type Config, loadConfig } from "./config";
+import { GetWorksite, PrismaWorksiteRepository } from "./modules/worksite";
 import { checkDatabase, createPrismaClient } from "./shared/infrastructure/db";
 import { createLogger, type Logger } from "./shared/infrastructure/logger";
 
@@ -25,7 +26,11 @@ function main(): void {
   const logger = createLogger(config.logLevel);
   const prisma = createPrismaClient(config.databaseUrl);
 
-  const app = createApp({ logger, checkDatabase: () => checkDatabase(prisma) });
+  const app = createApp({
+    logger,
+    checkDatabase: () => checkDatabase(prisma),
+    getWorksite: new GetWorksite(new PrismaWorksiteRepository(prisma)),
+  });
   const server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "listening");
   });

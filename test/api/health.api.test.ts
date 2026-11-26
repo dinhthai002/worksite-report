@@ -1,7 +1,6 @@
-import { createApp } from "@src/app";
-import { checkDatabase, createPrismaClient } from "@src/shared/infrastructure/db";
-import { createLogger } from "@src/shared/infrastructure/logger";
+import { createPrismaClient } from "@src/shared/infrastructure/db";
 import request from "supertest";
+import { createTestApp } from "../support/test-app";
 
 const databaseUrl: string | undefined = process.env.DATABASE_URL;
 if (databaseUrl === undefined) {
@@ -12,7 +11,7 @@ if (databaseUrl === undefined) {
 
 describe("GET /health", () => {
   const prisma = createPrismaClient(databaseUrl);
-  const app = createApp({ logger: createLogger("silent"), checkDatabase: () => checkDatabase(prisma) });
+  const app = createTestApp(prisma);
 
   afterAll(async () => {
     await prisma.$disconnect();
