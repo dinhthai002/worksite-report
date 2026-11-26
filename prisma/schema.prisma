@@ -26,6 +26,15 @@ enum WorksiteStatus {
   @@map("worksite_status")
 }
 
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  REJECTED
+  APPROVED
+
+  @@map("report_status")
+}
+
 model User {
   id        String   @id @db.Uuid
   name      String
@@ -35,6 +44,9 @@ model User {
 
   supervisedWorksites Worksite[]
   assignedTasks       Task[]
+  authoredReports     DailyReport[]
+  reportTransitions   ReportTransition[]
+  idempotencyKeys     IdempotencyKey[]
 
   @@map("users")
 }
@@ -47,8 +59,9 @@ model Worksite {
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime       @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  supervisor User   @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
+  supervisor User          @relation(fields: [supervisorId], references: [id], onDelete: Restrict)
   tasks      Task[]
+  reports    DailyReport[]
 
   @@index([supervisorId])
   @@map("worksites")
@@ -63,10 +76,88 @@ model Task {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
-  worksite Worksite @relation(fields: [worksiteId], references: [id], onDelete: Restrict)
-  assignee User     @relation(fields: [assigneeId], references: [id], onDelete: Restrict)
+  worksite    Worksite     @relation(fields: [worksiteId], references: [id], onDelete: Restrict)
+  assignee    User         @relation(fields: [assigneeId], references: [id], onDelete: Restrict)
+  reportItems ReportItem[]
 
   @@index([worksiteId])
   @@index([assigneeId])
   @@map("tasks")
+}
+
+// Feature 002 (specs/002-draft-and-submit/data-model.md section 2). CHECK constraints and triggers are in the migration.
+
+model DailyReport {
+  id         String       @id @db.Uuid
+  worksiteId String       @map("worksite_id") @db.Uuid
+  authorId   String       @map("author_id") @db.Uuid
+  workDate   DateTime     @map("work_date") @db.Date
+  status     ReportStatus @default(DRAFT)
+  version    Int          @default(1)
+  note       String?
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  worksite    Worksite           @relation(fields: [worksiteId], references: [id], onDelete: Restrict)
+  author      User               @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  items       ReportItem[]
+  transitions ReportTransition[]
+
+  // BR-1: at most one report per foreman, worksite and work date.
+  @@unique([worksiteId, authorId, workDate])
+  @@index([authorId])
+  @@map("daily_reports")
+}
+
+model ReportItem {
+  reportId         String   @map("report_id") @db.Uuid
+  taskId           String   @map("task_id") @db.Uuid
+  reportedProgress Int      @map("reported_progress")
+  note             String?
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  report DailyReport @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  task   Task        @relation(fields: [taskId], references: [id], onDelete: Restrict)
+
+  // BR-4: a task appears at most once in a report.
+  // Named so the client field is camelCase (NAM-02); the database constraint name is unchanged.
+  @@id([reportId, taskId], name: "reportTask")
+  @@index([taskId])
+  @@map("report_items")
+}
+
+model ReportTransition {
+  id         String       @id @db.Uuid
+  reportId   String       @map("report_id") @db.Uuid
+  fromStatus ReportStatus @map("from_status")
+  toStatus   ReportStatus @map("to_status")
+  actorId    String       @map("actor_id") @db.Uuid
+  occurredAt DateTime     @map("occurred_at") @db.Timestamptz(6)
+  reason     String?
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime     @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  report DailyReport @relation(fields: [reportId], references: [id], onDelete: Restrict)
+  actor  User        @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([reportId, occurredAt])
+  @@map("report_transitions")
+}
+
+model IdempotencyKey {
+  actorId        String    @map("actor_id") @db.Uuid
+  key            String
+  requestHash    String    @map("request_hash")
+  responseStatus Int?      @map("response_status")
+  responseBody   Json?     @map("response_body")
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  // BR-14: a request key belongs to the user who sent it.
+  @@id([actorId, key], name: "actorKey")
+  @@map("idempotency_keys")
 }

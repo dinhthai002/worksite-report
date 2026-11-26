@@ -1,5 +1,15 @@
 import { randomUUID } from "node:crypto";
-import type { Task, User, UserRole, Worksite, WorksiteStatus } from "@prisma/client";
+import type {
+  DailyReport,
+  ReportItem,
+  ReportStatus,
+  ReportTransition,
+  Task,
+  User,
+  UserRole,
+  Worksite,
+  WorksiteStatus,
+} from "@prisma/client";
 import type { DatabaseClient } from "@src/shared/infrastructure/db";
 
 /**
@@ -81,6 +91,83 @@ export async function insertTask(client: DatabaseClient, row: TaskRow = {}): Pro
       assigneeId,
       ...(row.approvedProgress === undefined ? {} : { approvedProgress: row.approvedProgress }),
       ...times(row),
+    },
+  });
+}
+
+export interface ReportRow extends Timestamps {
+  readonly id?: string;
+  readonly worksiteId?: string;
+  readonly authorId?: string;
+  /** `YYYY-MM-DD`. */
+  readonly workDate?: string;
+  readonly status?: ReportStatus;
+  readonly version?: number;
+  readonly note?: string | null;
+}
+
+export interface ReportItemRow extends Timestamps {
+  readonly reportId: string;
+  readonly taskId: string;
+  readonly reportedProgress?: number;
+  readonly note?: string | null;
+}
+
+export interface TransitionRow {
+  readonly id?: string;
+  readonly reportId: string;
+  readonly actorId: string;
+  readonly fromStatus?: ReportStatus;
+  readonly toStatus?: ReportStatus;
+  readonly occurredAt?: Date;
+  readonly reason?: string | null;
+}
+
+/**
+ * Inserts a daily report directly, so a test can prepare a status no endpoint reaches yet (research R17).
+ * Defaults: a new worksite and a new Foreman author, work date 2026-11-20, DRAFT, version 1, no note (TST-10).
+ */
+export async function insertReport(client: DatabaseClient, row: ReportRow = {}): Promise<DailyReport> {
+  const worksiteId = row.worksiteId ?? (await insertWorksite(client)).id;
+  const authorId = row.authorId ?? (await insertUser(client)).id;
+  return client.dailyReport.create({
+    data: {
+      id: row.id ?? randomUUID(),
+      worksiteId,
+      authorId,
+      workDate: new Date(`${row.workDate ?? "2026-11-20"}T00:00:00Z`),
+      status: row.status ?? "DRAFT",
+      version: row.version ?? 1,
+      note: row.note ?? null,
+      ...times(row),
+    },
+  });
+}
+
+/** Inserts a report item. Defaults: progress 0, no note (TST-10). */
+export function insertReportItem(client: DatabaseClient, row: ReportItemRow): Promise<ReportItem> {
+  return client.reportItem.create({
+    data: {
+      reportId: row.reportId,
+      taskId: row.taskId,
+      reportedProgress: row.reportedProgress ?? 0,
+      note: row.note ?? null,
+      ...times(row),
+    },
+  });
+}
+
+/** Inserts a transition. Defaults: DRAFT to SUBMITTED at 2026-11-20T10:00:00Z, no reason (TST-10). */
+export function insertTransition(client: DatabaseClient, row: TransitionRow): Promise<ReportTransition> {
+  return client.reportTransition.create({
+    data: {
+      id: row.id ?? randomUUID(),
+      reportId: row.reportId,
+      actorId: row.actorId,
+      fromStatus: row.fromStatus ?? "DRAFT",
+      toStatus: row.toStatus ?? "SUBMITTED",
+      occurredAt: row.occurredAt ?? new Date("2026-11-20T10:00:00Z"),
+      reason: row.reason ?? null,
     },
   });
 }
