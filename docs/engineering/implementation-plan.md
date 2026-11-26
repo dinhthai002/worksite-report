@@ -155,7 +155,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | `reporting/domain` | `DailyReport` aggregate with `ReportItem` entities. `WorkDate` value object, validated against `Clock.today()` and the backdating limit (BR-2). `ReportStatus` with one transition table covering all four statuses (TST-11). `ReportTransition` records actor, time with offset, and reason (BR-11). `DailyReportRepository` port. Rules: BR-3 worksite must be `ACTIVE`; BR-4 each task appears once, belongs to the worksite and is assigned to the author; BR-5 reported progress is not below approved progress, checked at submit; BR-6 only the author edits, only in `DRAFT` or `REJECTED`; BR-7 at least one item to submit |
 | `reporting/application` | `SaveDraft` (UC-1: creates or updates the caller's report for the work date; BR-1 returns the existing report instead of creating a new one). `SubmitReport` (UC-2). `GetReport` (the report with its transitions) |
 | `reporting/infrastructure` | `PrismaDailyReportRepository`: every write is conditional on `version` and increments it (BR-15, DB-03); `P2002` becomes a domain error (ERR-04); a concurrent first save resolves to the existing report (BR-1). `daily-report.mapper.ts` |
-| Persistence | Migration for `daily_reports` (`UNIQUE (worksite_id, author_id, work_date)`, `version`), `report_items` (`UNIQUE (report_id, task_id)`, `CHECK (reported_progress BETWEEN 0 AND 100)`), `report_transitions` (append-only: a trigger rejects `UPDATE` and `DELETE`), `idempotency_keys` (`UNIQUE (actor_id, key)`, nullable response columns, `completed_at`) |
+| Persistence | Migration for `daily_reports` (`UNIQUE (worksite_id, author_id, work_date)`, `version`), `report_items` (primary key `(report_id, task_id)`, `CHECK (reported_progress BETWEEN 0 AND 100)`), `report_transitions` (append-only: a trigger rejects `UPDATE` and `DELETE`), `idempotency_keys` (primary key `(actor_id, key)`, nullable response columns, `completed_at`) |
 | `shared/infrastructure/http` | `idempotency.middleware.ts`: claim-first idempotency for every `POST` and `PUT` (BR-14, API-02) |
 | `reporting/interface` | `report.routes.ts`: `PUT /worksites/:worksiteId/reports/:workDate`, `POST /reports/:reportId/submit`, `GET /reports/:reportId`. `report.schemas.ts`. Requests carry `version`; every report response includes the current `version` (API-04) |
 | Wiring | `main.ts` creates `SystemClock` from `APP_TIME_ZONE` and passes it and `BACKDATE_LIMIT_DAYS` to the use cases |
@@ -167,25 +167,25 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 | --- | --- |
 | Unit | TST-11: a table-driven test over all 16 pairs of statuses, each either allowed or rejected |
 | Unit | `BR-1` saving again for the same worksite and work date returns the existing report |
-| Unit | `BR-2` rejects a future work date; rejects a date more than the limit before today; accepts the boundary date; "today" follows `APP_TIME_ZONE` (`FixedClock` near midnight) |
+| Unit | `BR-2` rejects a future work date; rejects a date more than the limit before today; accepts the boundary date; "today" follows `APP_TIME_ZONE` (`FixedClock` near midnight). Tested at the default limit of 365 days |
 | Unit | `BR-3` rejects saving and submitting for a `CLOSED` worksite |
 | Unit | `BR-4` rejects a duplicated task, a task from another worksite, and a task assigned to another foreman, naming the task |
-| Unit | `BR-5` rejects progress outside 0 to 100 on save; rejects progress below approved progress on submit, naming the task and its approved progress |
+| Unit | `BR-5` rejects progress outside 0 to 100 on save, naming the task, as a `422` rule violation from the domain (not a `400` from the schema); rejects progress below approved progress on submit, naming the task and its approved progress |
 | Unit | `BR-6` rejects edits by another foreman, and edits in `SUBMITTED` or `APPROVED` |
 | Unit | `BR-7` rejects submitting a report with no items |
 | Unit | `BR-11` submitting records a transition with actor and time |
 | Unit | `BR-14` the middleware replays a stored response, rejects a reused key with a different body, and reports a key still in progress |
 | Integration | `BR-1` the unique constraint rejects a second report for the same foreman, worksite and work date |
-| Integration | `BR-4` the unique constraint rejects the same task twice in a report |
+| Integration | `BR-4` the primary key of `report_items` rejects the same task twice in a report |
 | Integration | `BR-5` `report_items.reported_progress` outside 0 to 100 is rejected by the database |
 | Integration | `BR-11` `report_transitions` rejects `UPDATE` and `DELETE` |
-| Integration | `BR-14` the unique constraint rejects a second claim of the same actor and key |
+| Integration | `BR-14` the primary key of `idempotency_keys` rejects a second claim of the same actor and key |
 | Integration | `BR-15` a save with a stale `version` updates zero rows and raises a conflict |
 | Integration | Report mapper round trip |
-| API | `idempotency.api.test.ts`: five identical requests yield one report and five identical responses (UC-1 acceptance); the same key with a different body returns `422`; two concurrent requests with the same key: one succeeds, one returns `409` |
+| API | `idempotency.api.test.ts`: five identical requests yield one report and five identical responses (UC-1 acceptance); the same key with a different body returns `422`; two concurrent requests with the same key create one report, and either one succeeds and the other returns `409 IDEMPOTENCY_KEY_IN_PROGRESS`, or both return the same success (the second arrived after the first was stored). The `409` itself is proven deterministically by the middleware's unit test |
 | API | `concurrency.api.test.ts`: two saves from the same version: one succeeds, one returns `409` with the current version (UC-1 acceptance) |
 | API | Draft and submit succeed and return `version`; invalid body returns `400`; a site supervisor saving a draft returns `403`; reporting on another foreman's task returns `422` |
-| API | `GET /reports/:id` returns the report, its items and its transitions |
+| API | `GET /reports/:id` returns the report, its items and its transitions to the author; the worksite's site supervisor gets `200` once submitted and `403` for a draft; another foreman and the supervisor of another worksite get `403`; an unknown report gets `404` |
 
 **Exit criteria.**
 
@@ -381,3 +381,4 @@ These need the product owner, because `docs/product/` and the glossary are chang
 | P3 | Nothing closes a worksite, but BR-3 depends on `CLOSED`. Add an action, or confirm it stays out of scope? | Step 2 |
 | P4 | BR-14 and BR-15 apply to every write, but UC-2 and UC-4 do not list them, and UC-3 lists only BR-15. Align the "Applies" lines? Answered 2026-11-26: UC-2 to UC-4 list them | Step 2 |
 | P5 | The glossary has no entry for "User", although the PRD model has a `USER` entity. Add one? | Step 1 |
+| P6 | BR-3 lets a `SUBMITTED` report be rejected after its worksite is closed, but refuses saving and submitting on a closed worksite, so that report stays `REJECTED` for good. Accept this, or let the author edit and resubmit it? Feature 004 builds the rules as written | After Step 4 |

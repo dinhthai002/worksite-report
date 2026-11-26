@@ -41,3 +41,51 @@ X-Actor-Role: FOREMAN
 GET {{baseUrl}}/worksites/{{townhouse}}
 X-Actor-Id: {{mark}}
 X-Actor-Role: SITE_SUPERVISOR
+
+# ---------------------------------------------------------------------------------------------------
+# Feature 002: Mark drafts, edits and submits his report for 20 November (PRD example).
+# Every PUT and POST carries its own Idempotency-Key. Sending a request again with the same key
+# replays the first answer and changes nothing; change the key to make a new request.
+# Reports are not part of the example data: to repeat this from scratch, run `docker compose down -v`.
+@walls = 00000000-0000-4000-8000-000000000202
+
+### Mark drafts Build ground-floor walls at 55%: 201, DRAFT, version 1.
+# @name draft
+PUT {{baseUrl}}/worksites/{{townhouse}}/reports/2026-11-20
+X-Actor-Id: {{mark}}
+X-Actor-Role: FOREMAN
+Idempotency-Key: walkthrough-002-draft
+Content-Type: application/json
+
+{ "items": [{ "taskId": "{{walls}}", "reportedProgress": 55 }] }
+
+###
+@reportId = {{draft.response.body.$.id}}
+
+### Mark adds a note, from version 1: 200, DRAFT, version 2.
+PUT {{baseUrl}}/worksites/{{townhouse}}/reports/2026-11-20
+X-Actor-Id: {{mark}}
+X-Actor-Role: FOREMAN
+Idempotency-Key: walkthrough-002-edit
+Content-Type: application/json
+
+{ "version": 1, "note": "Rain from 15:00.", "items": [{ "taskId": "{{walls}}", "reportedProgress": 55 }] }
+
+### Mark submits from version 2: 200, SUBMITTED, version 3, one transition DRAFT -> SUBMITTED.
+POST {{baseUrl}}/reports/{{reportId}}/submit
+X-Actor-Id: {{mark}}
+X-Actor-Role: FOREMAN
+Idempotency-Key: walkthrough-002-submit
+Content-Type: application/json
+
+{ "version": 2 }
+
+### Linda views the submitted report: 200, with its items and history.
+GET {{baseUrl}}/reports/{{reportId}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR
+
+### Linda views the townhouse: Build ground-floor walls is still 40. Submitting changes no approved progress.
+GET {{baseUrl}}/worksites/{{townhouse}}
+X-Actor-Id: {{linda}}
+X-Actor-Role: SITE_SUPERVISOR

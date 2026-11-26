@@ -179,7 +179,14 @@ A use case that changes more than one row does it in a single `$transaction` (DB
 
 ### 5.4 Idempotency
 
-`idempotency.middleware.ts` stores, per actor and request key, a hash of the request and the response that was returned. A repeated key with the same hash replays the stored response. A repeated key with a different hash is rejected with `422`.
+`idempotency.middleware.ts` stores, per actor and request key, a hash of the request and the response that was returned. It runs on every `POST` and `PUT`:
+
+- A missing or malformed `Idempotency-Key` is a `400`.
+- The key is claimed first, by inserting `(actor_id, key, request_hash)` with no response yet. The primary key on `(actor_id, key)` decides which of two concurrent requests owns it.
+- A repeated key with the same hash replays the stored response once it is complete. While the first request is still running, the duplicate gets `409 IDEMPOTENCY_KEY_IN_PROGRESS`.
+- A repeated key with a different hash is rejected with `422 IDEMPOTENCY_KEY_REUSED`.
+- A successful response is stored before it is sent, so a client that retries as soon as it gets an answer finds the key completed.
+- A request that fails or is refused releases the key, so sending it again is processed afresh.
 
 ### 5.5 Timestamps and list order
 
@@ -197,7 +204,7 @@ Every request that changes state goes through the same path:
 4. The module's route validates the input with Zod and calls one use case (ARC-07).
 5. The use case loads aggregates through repository ports, checks permissions, and calls methods on the aggregates, which enforce the business rules (ARC-05).
 6. The repository writes the result, conditionally on `version` and in one transaction where needed.
-7. `error-handler.ts` turns any error into the response shape in 4.2. On success, the response is stored against the request key.
+7. `error-handler.ts` turns any error into the response shape in 4.2. On success, the response is stored against the request key; on failure, the key is released.
 
 ## 7. Configuration
 
