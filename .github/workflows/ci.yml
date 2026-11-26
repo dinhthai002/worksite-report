@@ -30,6 +30,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Production dependencies only: dev tools never reach the image. package.json `overrides` patches
+      # advisories in Prisma 6's own dependencies.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -49,8 +54,7 @@ jobs:
       - name: Docker build
         run: docker build --tag worksite-report:ci .
 
-      # Report only: exit-code 0 until the Prisma 7 upgrade clears the known high-severity advisories.
-      # Then set exit-code to 1 so a fixable HIGH or CRITICAL vulnerability fails the build.
+      # Fails on a HIGH or CRITICAL vulnerability that has a fix, in OS packages or node_modules.
       - name: Scan the image with Trivy
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -58,4 +62,4 @@ jobs:
           version: v0.76.2
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "0"
+          exit-code: "1"

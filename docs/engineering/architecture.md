@@ -245,7 +245,7 @@ The application runs with Docker Compose. One command starts everything: `docker
 | `migrate` | Application image | Runs `prisma migrate deploy`, then the seed in fill mode (adds missing example rows, changes nothing that exists), then exits. Starts after `db` is healthy |
 | `api` | Application image | Runs the HTTP server. Starts after `migrate` completes successfully. Healthcheck on `GET /health` |
 
-- The `Dockerfile` is multi-stage: a build stage compiles TypeScript and generates the Prisma client, and a runtime stage contains only production dependencies and the compiled output, running as a non-root user.
+- The `Dockerfile` is multi-stage: a build stage compiles TypeScript and generates the Prisma client, and a runtime stage contains only production dependencies and the compiled output, running as a non-root user. The runtime stage removes the npm CLI after installing: the containers run only `node` and `node_modules/.bin/prisma`.
 - Configuration comes from environment variables in `docker-compose.yml`. `.env.example` lists them. No secrets are committed.
 - `main.ts` handles `SIGTERM`: it stops accepting connections, waits for in-flight requests, closes the Prisma client, and exits.
 
@@ -254,21 +254,19 @@ The application runs with Docker Compose. One command starts everything: `docker
 One workflow on every push and pull request. All steps must pass.
 
 1. `npm ci`, whose `postinstall` runs `prisma generate`
-2. Typecheck: `tsc --noEmit`
-3. Lint and format: `biome ci`
-4. Architecture: `depcruise src`
-5. Unit tests
-6. Integration and API tests, with PostgreSQL from Testcontainers
-7. `docker build`
-8. Trivy scan of the image for HIGH and CRITICAL vulnerabilities that have a fix. Report only until the Prisma 7 upgrade; then it fails the build
+2. Audit: `npm audit --omit=dev --audit-level=high`
+3. Typecheck: `tsc --noEmit`
+4. Lint and format: `biome ci`
+5. Architecture: `depcruise src`
+6. Unit tests
+7. Integration and API tests, with PostgreSQL from Testcontainers
+8. `docker build`
+9. Trivy scan of the image: fails on a HIGH or CRITICAL vulnerability that has a fix
 
-`npm run check` runs steps 2 to 5 locally.
+`npm run check` runs steps 3 to 6 locally.
 
-Security checks outside the `ci` workflow:
+`package.json` `overrides` pins patched versions of `deepmerge-ts` and `effect` under `@prisma/config`, because Prisma 6 pins vulnerable versions of both. Remove the overrides when Prisma is upgraded to a version that no longer needs them.
 
-| What | Where | When |
-| --- | --- | --- |
-| `npm audit --omit=dev --audit-level=high` | `.github/workflows/audit.yml` | Weekly, or by hand. Never blocks a push |
-| Dependency updates for npm, GitHub Actions, Docker, Compose | `.github/dependabot.yml` | Weekly pull requests |
+Dependabot (`.github/dependabot.yml`) opens weekly pull requests for npm, GitHub Actions, Docker, and Compose updates.
 
 All actions are pinned to a commit SHA, with the version in a comment.
