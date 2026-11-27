@@ -6,44 +6,50 @@ Related documents:
 
 - [Use cases](./use-cases.md): main flows, acceptance criteria, and business rules BR-1 to BR-15
 - [Glossary](../glossary.md): definitions of every term used here
+- [Implementation plan, section 2.1](../engineering/implementation-plan.md#21-domain-model): the domain model, with every entity and relationship
 
-## Model
+## Flow
 
-Terms are defined in the [glossary](../glossary.md).
+The site supervisor sets the worksite up once. After that, the foremen report and the site supervisor reviews, every working day.
 
 ```mermaid
-erDiagram
-    USER ||--o{ WORKSITE : "supervises"
-    USER ||--o{ TASK : "is assigned"
-    USER ||--o{ DAILY_REPORT : "authors"
-    WORKSITE ||--o{ TASK : "has"
-    WORKSITE ||--o{ DAILY_REPORT : "has"
-    DAILY_REPORT ||--o{ REPORT_ITEM : "contains"
-    TASK ||--o{ REPORT_ITEM : "progress of"
+sequenceDiagram
+    actor S as Site Supervisor
+    actor F as Foreman
+    participant W as Worksite and tasks
+    participant R as Daily report
 
-    WORKSITE {
-        string name
-        user supervisor
-        enum status "ACTIVE or CLOSED"
-    }
-    TASK {
-        string name
-        user assignee "exactly one foreman"
-        int approvedProgress "0 to 100"
-    }
-    DAILY_REPORT {
-        date workDate
-        user author
-        string note
-        enum status
-    }
-    REPORT_ITEM {
-        int reportedProgress "0 to 100"
-        string note
-    }
+    S->>W: Create a worksite and become its supervisor
+    S->>W: Add tasks and assign each to one foreman (BR-13)
+
+    Note over F,R: At the end of each work day
+    F->>R: Save a draft with one item per task worked on (UC-1)
+    F->>R: Submit (UC-2)
+
+    alt Approve
+        S->>R: Approve (UC-3)
+        R->>W: Each task's approved progress becomes the item's reported progress (BR-9)
+    else Reject
+        S->>R: Reject with a reason (UC-4)
+        F->>R: Edit and resubmit
+        Note over S,R: The site supervisor reviews the report again
+    end
 ```
 
-The model rests on two figures. A foreman states **reported progress** in a report item, and the task keeps **approved progress**, which changes only when a report is approved. A task is complete when its approved progress is 100%.
+1. **Set up.** The site supervisor creates a worksite, adds its tasks, and assigns each task to one foreman.
+2. **Report.** At the end of a work day, each foreman writes one daily report per worksite, with one report item for each of their tasks worked on that day. They can save it as a draft as often as they like, then submit it.
+3. **Review.** The site supervisor of that worksite reviews the submitted report:
+   - **Approve:** the report becomes final, and the approved progress of every task in it is updated.
+   - **Reject:** the report goes back to the foreman with a reason. Task progress does not change. The foreman edits the report and submits it again, and the site supervisor reviews it again.
+
+## Reported and approved progress
+
+Progress is tracked as two figures:
+
+- **Reported progress** is what a foreman claims for one task in a report item, as of the end of the work date.
+- **Approved progress** is the official progress the task keeps. It changes only when the site supervisor approves a report: every task in the report takes the item's reported progress, all together or not at all (BR-9).
+
+A task is complete when its approved progress is 100%.
 
 ## Report lifecycle
 

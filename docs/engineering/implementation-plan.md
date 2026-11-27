@@ -46,6 +46,70 @@ Until step 5 is done, the PRD actions "Create a worksite" and "Create tasks and 
 
 Each step depends on the one before it. Tables are created in the step that first uses them, so each table is designed after its step's spec is clarified (architecture.md, section 5; DB-05).
 
+### 2.1 Domain model
+
+The entities the steps build, and how they relate. The product flow is in the [PRD](../product/prd.md), terms are defined in the [glossary](../glossary.md), and the rules cited here are in [use-cases.md](../product/use-cases.md). Each step designs its own tables from this model in its `data-model.md`.
+
+Every person is a user with exactly one role: **Site Supervisor** or **Foreman**. The diagram draws the two roles as separate boxes to show which role takes part in which relationship.
+
+```mermaid
+erDiagram
+    SITE_SUPERVISOR ||--o{ WORKSITE : "supervises"
+    WORKSITE ||--o{ TASK : "has"
+    FOREMAN ||--o{ TASK : "is assigned"
+    FOREMAN ||--o{ DAILY_REPORT : "authors"
+    WORKSITE ||--o{ DAILY_REPORT : "is reported in"
+    DAILY_REPORT ||--o{ REPORT_ITEM : "contains"
+    TASK ||--o{ REPORT_ITEM : "progress stated in"
+    DAILY_REPORT ||--o{ TRANSITION : "records"
+    FOREMAN ||--o{ TRANSITION : "submits"
+    SITE_SUPERVISOR ||--o{ TRANSITION : "approves or rejects"
+
+    SITE_SUPERVISOR {
+        string name
+    }
+    FOREMAN {
+        string name
+    }
+    WORKSITE {
+        string name
+        enum status "ACTIVE or CLOSED"
+    }
+    TASK {
+        string name
+        int approvedProgress "0 to 100, official"
+    }
+    DAILY_REPORT {
+        date workDate
+        string note
+        enum status "DRAFT, SUBMITTED, REJECTED, APPROVED"
+    }
+    REPORT_ITEM {
+        int reportedProgress "0 to 100, claimed"
+        string note
+    }
+    TRANSITION {
+        enum fromStatus
+        enum toStatus
+        timestamp occurredAt
+        string reason "required on rejection"
+    }
+```
+
+#### Relationships
+
+| Relationship | Cardinality | Rule |
+| --- | --- | --- |
+| A site supervisor supervises worksites | Each worksite has exactly one site supervisor. A site supervisor can supervise many worksites | Only that supervisor approves or rejects the worksite's reports (BR-12) |
+| A worksite has tasks | Each task belongs to exactly one worksite | |
+| A task is assigned to a foreman | Each task has exactly one foreman, its assignee. A foreman can have tasks on several worksites | Only the worksite's site supervisor assigns or reassigns a task (BR-13) |
+| A foreman authors daily reports | At most one daily report per foreman, worksite, and work date | BR-1 |
+| A daily report contains report items | One item per task worked on that day. A task appears at most once, and only if it belongs to the report's worksite and is assigned to the author | BR-4. At least one item to submit (BR-7) |
+| A report item states the progress of a task | Each item refers to exactly one task. A task appears in many reports over time | Reported progress is from 0 to 100 and not below the task's approved progress (BR-5) |
+| A daily report records transitions | Every status change is one transition: who, when, and the reason if any | BR-11. A rejection needs a reason (BR-8) |
+
+A foreman has no direct link to a worksite. They take part in a worksite only through the tasks assigned to them, and their daily report for that worksite covers only those tasks. When two foremen work on the same worksite on the same day, each writes their own daily report.
+
 ## 3. Decisions carried into the specs
 
 These were decided before the Spec-Kit work started. Specs apply them; they are not re-opened in clarify.
@@ -198,7 +262,7 @@ Earlier design notes (module files, domain model, endpoint list, table list, app
 **Questions to settle in `/speckit-clarify`.**
 
 - Does saving a draft replace the whole list of items, or update individual items?
-- Can a draft hold a note per report and per item (the PRD model has both), and are they required?
+- Can a draft hold a note per report and per item (the domain model, section 2.1, has both), and are they required?
 - Who may view a report: any user, or only the author and the worksite's site supervisor?
 - When a worksite is closed after a report is drafted but before it is submitted, is submission rejected (BR-3)? The rule says yes; confirm the message.
 
@@ -385,5 +449,5 @@ These need the product owner, because `docs/product/` and the glossary are chang
 | P2 | use-cases.md has no use case for viewing a report and its history. Who may view a report? Answered 2026-11-26: UC-5 View a report | Step 2 |
 | P3 | Nothing closes a worksite, but BR-3 depends on `CLOSED`. Add an action, or confirm it stays out of scope? | Step 2 |
 | P4 | BR-14 and BR-15 apply to every write, but UC-2 and UC-4 do not list them, and UC-3 lists only BR-15. Align the "Applies" lines? Answered 2026-11-26: UC-2 to UC-4 list them | Step 2 |
-| P5 | The glossary has no entry for "User", although the PRD model has a `USER` entity. Add one? | Step 1 |
+| P5 | The glossary has no entry for "User", although every person in the domain model (section 2.1) is a user with one role. Add one? | Step 1 |
 | P6 | BR-3 lets a `SUBMITTED` report be rejected after its worksite is closed, but refuses saving and submitting on a closed worksite, so that report stays `REJECTED` for good. Accept this, or let the author edit and resubmit it? Feature 004 builds the rules as written | After Step 4 |
