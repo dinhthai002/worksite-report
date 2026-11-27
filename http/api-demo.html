@@ -1,0 +1,337 @@
+<!doctype html>
+<!-- Demo run sheet for the Worksite Report API: open this file in a browser, start the app with
+     `docker compose up --build -d`, then copy each command into one terminal. Needs curl and jq. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worksite API Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* VOICE work: a run sheet to follow live in an interview
+   IDEA a site foreman's clipboard: numbered steps, who acts, what you should see
+   PICTURE the walls task's progress bar moving 40 → claimed 60 → approved 60 across the steps
+   COLOUR white ground, near-black ink, safety yellow accent, concrete grey panels
+   TYPE Archivo 800 for titles + Archivo text, IBM Plex Mono for commands
+   LAYOUT title and settings across the top, progress strip, then steps in one column; phone stacks the same order */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#121314);--ink:light-dark(#16181c,#ecebe7);--mute:light-dark(#5c5f66,#a3a5ab);--panel:light-dark(#f1efe9,#1c1e21);--line:light-dark(#dcd9d0,#2e3135);--code:light-dark(#16181c,#0a0b0c);--codeink:#f3f1ea;--yel:#f2b705;--yelink:#16181c;--ok:light-dark(#1d7a4a,#5fd39a);--bad:light-dark(#b3261e,#ff8a80)}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 Archivo,system-ui,sans-serif;margin:0;overflow-x:clip}
+.band{padding-block:clamp(20px,3vw,40px);padding-left:max(5vw,16px,env(safe-area-inset-left,0px));padding-right:max(5vw,16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:980px;margin:0 auto}
+.top{background:var(--yel);color:var(--yelink);margin-top:calc(-1*env(safe-area-inset-top,0px));padding-top:calc(env(safe-area-inset-top,0px) + 28px)}
+h1{font-weight:800;font-size:clamp(32px,5vw,46px);line-height:1.05;letter-spacing:-.02em;margin:0 0 6px}
+.lede{margin:0;max-width:62ch}
+h2{font-weight:800;font-size:26px;letter-spacing:-.01em;line-height:1.1;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 18px}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(14em,1fr));gap:12px;margin-top:20px}
+.settings label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+input{font:16px/1.3 "IBM Plex Mono",monospace;padding:10px 12px;border:2px solid var(--yelink);border-radius:6px;background:#fff;color:#16181c;width:100%}
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stage{background:var(--panel);border-radius:8px;padding:12px 14px}
+.stage b{display:block;font-size:14px}
+.stage span{color:var(--mute);font-size:13px}
+.bar{position:relative;height:14px;border-radius:7px;background:var(--line);margin:10px 0 6px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--ink);border-radius:7px}
+.bar u{position:absolute;inset:0 auto 0 0;border-radius:7px;background:repeating-linear-gradient(135deg,var(--yel) 0 6px,transparent 6px 10px);border:2px solid var(--yel)}
+.fig{font:800 22px/1 Archivo,sans-serif}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px;padding-block:18px;border-top:1px solid var(--line)}
+.num{width:44px;height:44px;border-radius:50%;background:var(--yel);color:var(--yelink);display:grid;place-items:center;font-weight:800;font-size:18px}
+.num.alt{background:var(--panel);color:var(--ink);border:2px solid var(--line)}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 12px}
+.head h3{margin:0;font-size:19px;font-weight:800}
+.who{font-size:13px;font-weight:600;padding:2px 10px;border-radius:99px;background:var(--panel);border:1px solid var(--line);white-space:nowrap}
+.expect{margin:6px 0 10px;color:var(--mute)}
+.expect strong{color:var(--ink)}
+.code{position:relative}
+pre{margin:0;background:var(--code);color:var(--codeink);border-radius:8px;padding:14px 16px;padding-right:84px;font:14px/1.6 "IBM Plex Mono",monospace;overflow-x:auto;white-space:pre}
+.copy{position:absolute;top:8px;right:8px;font:600 14px Archivo,sans-serif;padding:8px 12px;min-height:36px;border-radius:6px;border:0;background:var(--yel);color:var(--yelink);cursor:pointer}
+.copy:hover{filter:brightness(1.07)}
+.copy:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+.copy.done{background:#fff;color:#16181c}
+.note{background:var(--panel);border-left:4px solid var(--yel);border-radius:6px;padding:12px 14px;margin:0 0 6px}
+.note code,.expect code,.lede code{font:14px "IBM Plex Mono",monospace}
+.divider{display:flex;align-items:center;gap:14px;margin:8px 0 0}
+.divider::after{content:"";flex:1;height:2px;background:var(--line)}
+details{margin-top:6px;border-top:1px solid var(--line);padding-top:14px}
+summary{cursor:pointer;font-weight:800;font-size:19px}
+.ok{color:var(--ok);font-weight:600}.bad{color:var(--bad);font-weight:600}
+@media(max-width:700px){.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.step{grid-template-columns:36px minmax(0,1fr);gap:10px}.num{width:36px;height:36px;font-size:16px}pre{font-size:13px}}
+</style>
+</head>
+<body>
+<header class="band top"><div class="wrap">
+  <h1>Worksite Report API demo</h1>
+  <p class="lede">Copy each command into one terminal, in order. Mark claims progress on a task, Linda approves it, and only then does the task's official progress change.</p>
+  <div class="settings">
+    <label for="base">API base URL<input id="base" value="http://localhost:3000" spellcheck="false"></label>
+    <label for="day">Work date (today or earlier)<input id="day" type="date"></label>
+  </div>
+</div></header>
+
+<section class="band"><div class="wrap">
+  <h2>What to watch: Build ground-floor walls</h2>
+  <p class="sub">Black is approved progress, the official figure. Yellow stripes are Mark's claim.</p>
+  <div class="strip">
+    <div class="stage"><b>Before</b><div class="bar"><i style="width:40%"></i></div><span class="fig">40%</span> <span>approved</span></div>
+    <div class="stage"><b>Step 2: Mark claims 60%</b><div class="bar"><u style="width:60%"></u><i style="width:40%"></i></div><span class="fig">40%</span> <span>still approved</span></div>
+    <div class="stage"><b>Step 3: submitted</b><div class="bar"><u style="width:60%"></u><i style="width:40%"></i></div><span class="fig">40%</span> <span>waiting for Linda</span></div>
+    <div class="stage"><b>Step 4: Linda approves</b><div class="bar"><i style="width:60%"></i></div><span class="fig">60%</span> <span>now official</span></div>
+  </div>
+</div></section>
+
+<main class="band" style="padding-top:0"><div class="wrap">
+  <h2>Main flow</h2>
+  <p class="sub">About three minutes. Every write sends an <code>Idempotency-Key</code> and, after the first save, the report's <code>version</code>.</p>
+
+  <div class="note">For a clean start, before the interview: <code>docker compose down -v &amp;&amp; docker compose up --build -d</code>. This removes earlier reports. To rehearse again without it, pick another work date above.</div>
+
+  <article class="step">
+    <div class="num">0</div>
+    <div>
+      <div class="head"><h3>Set the variables</h3></div>
+      <p class="expect">Run once. Every command below uses these names. <code>RUN</code> makes each rehearsal's keys new.</p>
+      <div class="code"><pre id="setup"></pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num">1</div>
+    <div>
+      <div class="head"><h3>Mark views the worksite</h3><span class="who">Mark · Foreman</span></div>
+      <p class="expect">Only Mark's two tasks. Walls at <strong>40</strong>. Henry's task is hidden from him.</p>
+      <div class="code"><pre>curl -s "$BASE/worksites/$SITE" \
+  -H "X-Actor-Id: $MARK" -H "X-Actor-Role: FOREMAN" | jq</pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num">2</div>
+    <div>
+      <div class="head"><h3>Mark saves a draft: walls at 60%</h3><span class="who">Mark · Foreman</span></div>
+      <p class="expect"><strong>DRAFT, version 1.</strong> The report ID is kept in <code>REPORT_ID</code> for the next steps.</p>
+      <div class="code"><pre>REPORT=$(curl -s -X PUT "$BASE/worksites/$SITE/reports/$DAY" \
+  -H "X-Actor-Id: $MARK" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: mark-save-$RUN" -H "Content-Type: application/json" \
+  -d '{"items":[{"taskId":"00000000-0000-4000-8000-000000000202","reportedProgress":60}]}')
+echo "$REPORT" | jq; REPORT_ID=$(echo "$REPORT" | jq -r .id)</pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num">3</div>
+    <div>
+      <div class="head"><h3>Mark submits</h3><span class="who">Mark · Foreman</span></div>
+      <p class="expect"><strong>SUBMITTED, version 2</strong>, one transition recorded. The walls are still 40: a claim is not progress yet.</p>
+      <div class="code"><pre>curl -s -X POST "$BASE/reports/$REPORT_ID/submit" \
+  -H "X-Actor-Id: $MARK" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: mark-submit-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":1}' | jq</pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num">4</div>
+    <div>
+      <div class="head"><h3>Linda approves</h3><span class="who">Linda · Site supervisor</span></div>
+      <p class="expect"><strong>APPROVED, version 3.</strong> Report and task change in one transaction.</p>
+      <div class="code"><pre>curl -s -X POST "$BASE/reports/$REPORT_ID/approve" \
+  -H "X-Actor-Id: $LINDA" -H "X-Actor-Role: SITE_SUPERVISOR" \
+  -H "Idempotency-Key: linda-approve-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":2}' | jq</pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num">5</div>
+    <div>
+      <div class="head"><h3>Linda checks the tasks</h3><span class="who">Linda · Site supervisor</span></div>
+      <p class="expect">Walls now <strong>60</strong>. Linda sees all three tasks.</p>
+      <div class="code"><pre>curl -s "$BASE/worksites/$SITE" \
+  -H "X-Actor-Id: $LINDA" -H "X-Actor-Role: SITE_SUPERVISOR" \
+  | jq '.tasks[] | {name, approvedProgress}'</pre></div>
+    </div>
+  </article>
+
+  <div class="divider"><h2>On request: reject and resubmit</h2></div>
+  <p class="sub">Henry reports Install electrical at 10%. Linda rejects it with a reason, Henry corrects it to 5% and resubmits, and Linda approves. Needs step 0 only.</p>
+
+  <article class="step">
+    <div class="num alt">R1</div>
+    <div>
+      <div class="head"><h3>Henry saves and submits</h3><span class="who">Henry · Foreman</span></div>
+      <p class="expect"><strong>SUBMITTED, version 2.</strong> The ID is kept in <code>HENRY_REPORT_ID</code>.</p>
+      <div class="code"><pre>HENRY_REPORT_ID=$(curl -s -X PUT "$BASE/worksites/$SITE/reports/$DAY" \
+  -H "X-Actor-Id: $HENRY" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: henry-save-$RUN" -H "Content-Type: application/json" \
+  -d '{"items":[{"taskId":"00000000-0000-4000-8000-000000000203","reportedProgress":10}]}' | jq -r .id)
+curl -s -X POST "$BASE/reports/$HENRY_REPORT_ID/submit" \
+  -H "X-Actor-Id: $HENRY" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: henry-submit-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":1}' | jq</pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num alt">R2</div>
+    <div>
+      <div class="head"><h3>Linda rejects with a reason</h3><span class="who">Linda · Site supervisor</span></div>
+      <p class="expect"><strong>REJECTED, version 3.</strong> The reason is in the last transition. Electrical stays at 0.</p>
+      <div class="code"><pre>curl -s -X POST "$BASE/reports/$HENRY_REPORT_ID/reject" \
+  -H "X-Actor-Id: $LINDA" -H "X-Actor-Role: SITE_SUPERVISOR" \
+  -H "Idempotency-Key: linda-reject-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":2,"reason":"Conduit laid, no wiring pulled yet"}' | jq</pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num alt">R3</div>
+    <div>
+      <div class="head"><h3>Henry corrects to 5% and resubmits</h3><span class="who">Henry · Foreman</span></div>
+      <p class="expect">The edit keeps it <strong>REJECTED, version 4</strong>. The resubmit makes it <strong>SUBMITTED, version 5</strong>.</p>
+      <div class="code"><pre>curl -s -X PUT "$BASE/worksites/$SITE/reports/$DAY" \
+  -H "X-Actor-Id: $HENRY" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: henry-edit-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":3,"items":[{"taskId":"00000000-0000-4000-8000-000000000203","reportedProgress":5}]}' | jq
+curl -s -X POST "$BASE/reports/$HENRY_REPORT_ID/submit" \
+  -H "X-Actor-Id: $HENRY" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: henry-resubmit-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":4}' | jq</pre></div>
+    </div>
+  </article>
+
+  <article class="step">
+    <div class="num alt">R4</div>
+    <div>
+      <div class="head"><h3>Linda approves and checks</h3><span class="who">Linda · Site supervisor</span></div>
+      <p class="expect"><strong>APPROVED, version 6.</strong> Electrical is now <strong>5</strong>, and the history keeps the rejection and its reason.</p>
+      <div class="code"><pre>curl -s -X POST "$BASE/reports/$HENRY_REPORT_ID/approve" \
+  -H "X-Actor-Id: $LINDA" -H "X-Actor-Role: SITE_SUPERVISOR" \
+  -H "Idempotency-Key: linda-approve-henry-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":5}' | jq '{status, version, transitions}'
+curl -s "$BASE/worksites/$SITE" \
+  -H "X-Actor-Id: $LINDA" -H "X-Actor-Role: SITE_SUPERVISOR" \
+  | jq '.tasks[] | {name, approvedProgress}'</pre></div>
+    </div>
+  </article>
+
+  <details>
+    <summary>On request: show the guarantees (after the main flow)</summary>
+    <p class="sub" style="margin-top:8px">Each prints the HTTP status on its last line.</p>
+
+    <article class="step">
+      <div class="num alt">G1</div>
+      <div>
+        <div class="head"><h3>Retry step 2 with the same key</h3></div>
+        <p class="expect"><span class="ok">201</span> with the first response replayed: still DRAFT, version 1, although the report is approved. Nothing is written (BR-14).</p>
+        <div class="code"><pre>curl -s -w '\nHTTP %{http_code}\n' -X PUT "$BASE/worksites/$SITE/reports/$DAY" \
+  -H "X-Actor-Id: $MARK" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: mark-save-$RUN" -H "Content-Type: application/json" \
+  -d '{"items":[{"taskId":"00000000-0000-4000-8000-000000000202","reportedProgress":60}]}'</pre></div>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="num alt">G2</div>
+      <div>
+        <div class="head"><h3>Same key, different body</h3></div>
+        <p class="expect"><span class="bad">422</span> <code>IDEMPOTENCY_KEY_REUSED</code>.</p>
+        <div class="code"><pre>curl -s -w '\nHTTP %{http_code}\n' -X PUT "$BASE/worksites/$SITE/reports/$DAY" \
+  -H "X-Actor-Id: $MARK" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: mark-save-$RUN" -H "Content-Type: application/json" \
+  -d '{"items":[{"taskId":"00000000-0000-4000-8000-000000000202","reportedProgress":70}]}'</pre></div>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="num alt">G3</div>
+      <div>
+        <div class="head"><h3>Write from a stale version</h3></div>
+        <p class="expect"><span class="bad">409</span> <code>REPORT_VERSION_CONFLICT</code>: your version 2, current version 3 (BR-15).</p>
+        <div class="code"><pre>curl -s -w '\nHTTP %{http_code}\n' -X POST "$BASE/reports/$REPORT_ID/approve" \
+  -H "X-Actor-Id: $LINDA" -H "X-Actor-Role: SITE_SUPERVISOR" \
+  -H "Idempotency-Key: linda-approve-again-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":2}'</pre></div>
+      </div>
+    </article>
+
+    <article class="step">
+      <div class="num alt">G4</div>
+      <div>
+        <div class="head"><h3>A foreman tries to approve</h3></div>
+        <p class="expect"><span class="bad">403</span> <code>REPORT_APPROVAL_FORBIDDEN</code> (BR-12).</p>
+        <div class="code"><pre>curl -s -w '\nHTTP %{http_code}\n' -X POST "$BASE/reports/$REPORT_ID/approve" \
+  -H "X-Actor-Id: $MARK" -H "X-Actor-Role: FOREMAN" \
+  -H "Idempotency-Key: mark-approve-$RUN" -H "Content-Type: application/json" \
+  -d '{"version":3}'</pre></div>
+      </div>
+    </article>
+  </details>
+</div></main>
+
+<script>
+{
+  const base = document.getElementById("base");
+  const day = document.getElementById("day");
+  const setup = document.getElementById("setup");
+  const pad = (n) => String(n).padStart(2, "0");
+  const now = new Date();
+  const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  day.max = today;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("demo-settings") || "{}"); } catch {
+    // Storage can be blocked, for example in a private window: start from the defaults.
+    saved = {};
+  }
+  base.value = saved.base || base.value;
+  day.value = saved.day && saved.day <= today ? saved.day : today;
+
+  const render = () => {
+    setup.textContent = [
+      `BASE=${base.value.trim().replace(/\/+$/, "")}`,
+      "SITE=00000000-0000-4000-8000-000000000101",
+      "LINDA=00000000-0000-4000-8000-000000000001",
+      "MARK=00000000-0000-4000-8000-000000000002",
+      "HENRY=00000000-0000-4000-8000-000000000003",
+      `DAY=${day.value || today}`,
+      "RUN=$(date +%s)",
+    ].join("\n");
+    try { localStorage.setItem("demo-settings", JSON.stringify({ base: base.value, day: day.value })); } catch {
+      // Storage can be blocked: the settings are a convenience, so the page works without them.
+    }
+  };
+  base.addEventListener("input", render);
+  day.addEventListener("input", render);
+  render();
+
+  document.querySelectorAll(".code").forEach((box) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "copy";
+    button.textContent = "Copy";
+    box.appendChild(button);
+    button.addEventListener("click", async () => {
+      const text = box.querySelector("pre").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Copied";
+      } catch {
+        // The clipboard can be refused: select the command so it can be copied by hand.
+        const range = document.createRange();
+        range.selectNodeContents(box.querySelector("pre"));
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        button.textContent = "Press Ctrl+C";
+      }
+      button.classList.add("done");
+      setTimeout(() => { button.textContent = "Copy"; button.classList.remove("done"); }, 1600);
+    });
+  });
+}
+</script>
+</body>
+</html>
