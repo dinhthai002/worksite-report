@@ -4,56 +4,58 @@ A backend for tracking construction progress through daily reports. Foremen repo
 
 The project is small on purpose, so it can show how a backend is built end to end: requirements written first, business rules with stable IDs, a layered architecture checked by tools, tests against a real database, and a CI pipeline with security checks.
 
-## Demo at a glance
-
-Each part below ends with **talking points** for presenting it.
-
-| # | Part | What to show | Time |
-| --- | --- | --- | --- |
-| 1 | [The product](#1-the-product-what-problem-it-solves) | The problem, the two roles, the report lifecycle | 3 min |
-| 2 | [Use cases and business rules](#2-use-cases-and-business-rules) | Five use cases, fifteen rules with IDs, three guarantees | 3 min |
-| 3 | [See it running](#3-see-it-running) | Swagger UI: draft, submit, approve, then the guarantees live | 5 min |
-| 4 | [Architecture and technology](#4-architecture-and-technology) | Modules, layers, request flow, design decisions | 4 min |
-| 5 | [Coding standard](#5-coding-standard) | Rules with IDs, enforced by tools | 2 min |
-| 6 | [Testing](#6-testing) | Three test layers, real PostgreSQL, rule IDs in test names | 3 min |
-| 7 | [CI and security](#7-ci-and-security) | The pipeline and the supply-chain checks | 2 min |
-| 8 | [Developer guide](#8-developer-guide-and-contributing) | Setup, the spec-first workflow, contributing | 2 min |
-| 9 | [Simplifications and next steps](#9-simplifications-and-next-steps) | What is left out, and why | 1 min |
-
 ## 1. The product: what problem it solves
 
 On a construction site, the people doing the work report progress every day, and someone responsible for the site must confirm it. If a reported figure becomes official immediately, a typo or an optimistic estimate ends up in the schedule. Worksite Report separates the two: a foreman **claims** progress in a daily report, and the site supervisor **approves** it. Only approved figures count.
 
-### Two roles
+### The flow
 
-| | Foreman | Site supervisor |
-| --- | --- | --- |
-| Works on | The tasks assigned to them | The worksites they supervise |
-| Reports | Creates, edits, submits, and resubmits their own daily report | Never writes a report |
-| Decides | — | Approves a report, or rejects it with a reason |
-| Sees | Their own reports, in any status | Reports in their worksites, once submitted |
-
-Each user has exactly one role, so the person who approves a report is never the person who wrote it.
-
-### The model
+The site supervisor sets the worksite up once. After that, the foremen report and the site supervisor reviews, every working day. The steps are described in the [PRD](docs/product/prd.md#flow).
 
 ```mermaid
-erDiagram
-    USER ||--o{ WORKSITE : "supervises"
-    USER ||--o{ TASK : "is assigned"
-    USER ||--o{ DAILY_REPORT : "authors"
-    WORKSITE ||--o{ TASK : "has"
-    WORKSITE ||--o{ DAILY_REPORT : "has"
-    DAILY_REPORT ||--o{ REPORT_ITEM : "contains"
-    TASK ||--o{ REPORT_ITEM : "progress of"
+sequenceDiagram
+    actor S as Site Supervisor
+    actor F as Foreman
+    participant W as Worksite and tasks
+    participant R as Daily report
+
+    S->>W: Create a worksite and become its supervisor
+    S->>W: Add tasks and assign each to one foreman (BR-13)
+
+    Note over F,R: At the end of each work day
+    F->>R: Save a draft with one item per task worked on (UC-1)
+    F->>R: Submit (UC-2)
+
+    alt Approve
+        S->>R: Approve (UC-3)
+        R->>W: Each task's approved progress becomes the item's reported progress (BR-9)
+    else Reject
+        S->>R: Reject with a reason (UC-4)
+        F->>R: Edit and resubmit
+        Note over S,R: The site supervisor reviews the report again
+    end
 ```
 
-The model rests on two figures:
+The flow rests on two figures:
 
 - **Reported progress**: the percentage a foreman states for one task, in one item of a daily report.
 - **Approved progress**: the official percentage the task keeps. It changes only when a report is approved.
 
-A daily report is one foreman's report for one worksite on one work date. It holds one item per task worked on that day.
+A daily report is one foreman's report for one worksite on one work date. It holds one item per task worked on that day, and every status change is recorded as a transition.
+
+### Use cases
+
+The [use cases](docs/product/use-cases.md) describe what users do.
+
+| ID | Use case | Who | What happens |
+| --- | --- | --- | --- |
+| UC-1 | Draft a report | Foreman | Picks a worksite and a date, enters progress per task, saves. Can save many times |
+| UC-2 | Submit a report | Foreman | Sends a draft or a rejected report for review |
+| UC-3 | Approve a report | Site supervisor | Approves. Each task's approved progress becomes its reported progress |
+| UC-4 | Reject and resubmit | Both | The supervisor rejects with a reason. The foreman edits and resubmits |
+| UC-5 | View a report | Both | Shows the report, its items, and its history of status changes |
+
+Some use cases have measurable acceptance criteria, for example "5 identical requests yield 1 report and 5 identical responses".
 
 ### The report lifecycle
 
@@ -69,65 +71,101 @@ stateDiagram-v2
 
 A rejected report does not go back to `DRAFT`. The foreman edits it while it is `REJECTED` and resubmits it, so the rejection reason stays in its history.
 
-### The example: a three-storey townhouse
-
-Linda supervises the worksite. Mark and Henry are foremen.
-
-| Task | Assignee | Approved progress |
-| --- | --- | --- |
-| Pour foundation | Mark | 100% |
-| Build ground-floor walls | Mark | 40% |
-| Install electrical | Henry | 0% |
-
-On 20 November, Mark reports the walls at 55% and Henry reports electrical at 10%. Linda approves Mark's report, so the walls become 55%. She rejects Henry's with the reason "conduit laid, no wiring pulled yet". Henry corrects the figure to 5% and resubmits, and Linda approves it. The full example is in the [PRD](docs/product/prd.md).
-
 > **Talking points**
 >
 > - The core idea is **reported progress vs approved progress**. A foreman's figure is a claim until the supervisor approves it.
-> - Two roles with separate permissions: whoever writes a report can never approve it.
 > - The lifecycle has four statuses and four allowed transitions. Every other transition is rejected, and every transition records who, when, and why.
 > - Requirements were written before any code: a PRD, use cases, and a [glossary](docs/glossary.md) that fixes the vocabulary used in documents, code, and tests.
 
-## 2. Use cases and business rules
+## 2. Architecture and technology
 
-The [use cases](docs/product/use-cases.md) describe what users do. The business rules are the constraints the system enforces. Every rule has a stable ID, and the same ID appears in the use case, in the code that implements the rule, and in the name of the test that proves it.
+The application has two modules, `worksite` and `reporting`, in one codebase, built into one Docker image with one HTTP entry point. The full design is in the [architecture document](docs/engineering/architecture.md).
 
-### Use cases
+### Technology
 
-| ID | Use case | Who | What happens |
-| --- | --- | --- | --- |
-| UC-1 | Draft a report | Foreman | Picks a worksite and a date, enters progress per task, saves. Can save many times |
-| UC-2 | Submit a report | Foreman | Sends a draft or a rejected report for review |
-| UC-3 | Approve a report | Site supervisor | Approves. Each task's approved progress becomes its reported progress |
-| UC-4 | Reject and resubmit | Both | The supervisor rejects with a reason. The foreman edits and resubmits |
-| UC-5 | View a report | Both | Shows the report, its items, and its history of status changes |
-
-Some use cases have measurable acceptance criteria, for example "5 identical requests yield 1 report and 5 identical responses".
-
-### Business rules
-
-| Group | Rules | In short |
+| Concern | Choice | Why |
 | --- | --- | --- |
-| Report validity | BR-1 to BR-5 | One report per foreman, worksite, and day. No future dates, and at most 365 days back. Only active worksites. Only your own tasks. Progress from 0 to 100, and never below approved progress |
-| Lifecycle | BR-6 to BR-11 | Only the author edits, and only in `DRAFT` or `REJECTED`. A report needs at least one item to be submitted. A rejection needs a reason. Approval is all or nothing. An approved report is final. Every transition is recorded |
-| Permissions | BR-12, BR-13 | Only the worksite's supervisor approves or rejects. Each task has exactly one foreman |
-| Data integrity | BR-14, BR-15 | Safe retries and no silent overwrites |
+| Runtime and language | Node.js 22 LTS, TypeScript 6 in `strict` mode | Long-term support, and types catch errors before tests do |
+| HTTP | Express 5 | Familiar and minimal. Version 5 handles errors thrown by async handlers |
+| Validation | Zod, at the HTTP boundary only | One schema validates input and produces the TypeScript type and the OpenAPI description |
+| Database | PostgreSQL 17 | Constraints, transactions, and time zones the rules depend on |
+| Data access | Prisma ORM 6 with Prisma Migrate | Generated types and reviewable migrations |
+| Logging | pino | Structured JSON, one line per request |
+| Tests | Jest, supertest, Testcontainers | Tests run against a real PostgreSQL in Docker |
+| Code quality | Biome, dependency-cruiser | Lint and format in one fast tool, and architecture rules as code |
+| Delivery | Docker, Docker Compose, GitHub Actions | One command to run, one pipeline to verify |
 
-### Three guarantees
+Left out on purpose: CQRS, event sourcing, message queues, and a dependency injection container. Dependencies are wired by hand in `main.ts`.
 
-| Guarantee | What it means | How | Rule |
-| --- | --- | --- | --- |
-| **Safe retries** | A request repeated after a network failure never creates a duplicate report. | Every write carries an `Idempotency-Key` header. | BR-14 |
-| **No silent overwrites** | A write based on a stale copy of a report is rejected. | Every write sends the report `version` it last read. | BR-15 |
-| **Atomic approval** | Approving a report updates every task in it, or changes nothing. | One database transaction across the report and its tasks. | BR-9 |
+### Coding standard
+
+The rules for writing code are in the [coding standard](docs/engineering/coding-standard.md).
+
+### Layers
+
+Each module follows **Domain-Driven Design (DDD)**. The business is modeled with DDD's building blocks: aggregates such as `DailyReport`, entities, value objects, and repositories. The code is split into four layers around that model, with the domain at the center.
+
+```
+ interface/        Express routes · Zod request schemas · OpenAPI description
+        │
+        ▼
+ application/      Use cases: one file = one business action
+        │
+        ▼
+ domain/           Aggregates · Entities · Value objects · Repository ports
+        ▲          (plain TypeScript, no framework or database imports)
+        │
+ infrastructure/   Prisma repositories · Mappers
+
+ shared/           Concepts used by every module (actor, clock, errors),
+                   database client, configuration, HTTP middleware
+```
+
+- `domain` holds the business rules and imports nothing but other domain code. No Express, Prisma, or Zod.
+- `application` holds the use cases. Each one loads aggregates through repositories, calls domain methods, and saves the result.
+- `infrastructure` implements the repository interfaces (ports) that `domain` declares.
+- A module is imported only through its `index.ts`. `worksite` never imports `reporting`.
+- These rules are checked by dependency-cruiser on every commit, not just written down.
+
+### How a write request flows
+
+1. The request logger assigns a request ID.
+2. The actor middleware reads `X-Actor-Id` and `X-Actor-Role`, or responds `401`.
+3. The idempotency middleware replays the stored response if the key was already used.
+4. The route validates the input with Zod and calls exactly one use case.
+5. The use case loads aggregates, checks permissions, and calls domain methods, which enforce the rules.
+6. The repository writes, conditionally on `version`, in one transaction where needed.
+7. The error handler maps domain errors to HTTP responses with one error shape.
 
 > **Talking points**
 >
-> - **Traceability.** BR-5 is defined in the use cases, implemented once in the domain with a `// BR-5` comment, and tested by tests whose names start with `BR-5`. `grep -r "BR-5"` finds all three.
-> - **A subtle rule:** BR-5 is checked twice, at submit and again at approval. If the report for the 20th is approved at 60% first, the report for the 19th at 40% can no longer be approved, so progress never goes backwards.
-> - The three guarantees are the hard part of the project. They are about **correctness under failure and concurrency**: network retries, two devices editing the same report, and an approval that must not half-succeed.
+> - Every technology choice has one reason. Nothing is there for its own sake.
+> - **DDD keeps the rules in one place.** The domain is pure TypeScript, so business rules can be read and tested without Express or a database.
+> - **Two modules with clear boundaries.** `reporting` uses `worksite` only through its `index.ts`, and never the other way round.
+> - **Optimistic locking** with a `version` column is what makes "no silent overwrites" work without holding database locks.
 
-## 3. See it running
+## 3. Implementation plan
+
+The PRD is built in five steps, one Spec-Kit feature each. Every step delivers one complete use case that can be tested on its own. The full plan, with each step's scope, questions, tests, and exit criteria, is in the [implementation plan](docs/engineering/implementation-plan.md).
+
+| Step | Feature | Delivers | Business rules | Status |
+| --- | --- | --- | --- | --- |
+| 1 | `001-worksite-seed` | View a worksite and its tasks, from example data | — | Done |
+| 2 | `002-draft-and-submit` | UC-1 Draft a report, UC-2 Submit a report | BR-1 to BR-7, BR-11, BR-14, BR-15 | Done |
+| 3 | `003-approve-report` | UC-3 Approve a report | BR-5 at approval, BR-9, BR-10, BR-12 | Done |
+| 4 | `004-reject-and-resubmit` | UC-4 Reject and resubmit, and the full PRD flow end to end | BR-8 | Done |
+| 5 | `005-worksite-management` | Create a worksite, add tasks, assign foremen | BR-13 | Not started |
+
+Each step follows the [workflow](docs/engineering/workflow.md): specify, clarify, plan, tasks, implement. A person approves the output of every step before the next one starts. Inside a step, code is built from the inside out: domain, then use cases, then repositories, then routes, each with its tests.
+
+> **Talking points**
+>
+> - **One use case per step.** Each step ends with working, tested behavior, not a half-built layer.
+> - **Tables are designed when first needed.** Step 2 adds the report tables, and steps 3 and 4 add none.
+> - Every step shares the same exit criteria: `npm run check` and `npm run test:all` pass, every rule has a test named after its ID, and `docker compose up` still works.
+> - Step 5 is not built yet, so worksites and tasks come from the example data.
+
+## 4. See it running
 
 ### Start
 
@@ -146,48 +184,7 @@ This starts PostgreSQL, applies migrations, loads the example data, and starts t
 | <http://localhost:3000/openapi.json> | OpenAPI description |
 | <http://localhost:3000/health> | Liveness and database check |
 
-### Example data
-
-| Name | Role | User ID |
-| --- | --- | --- |
-| Linda | `SITE_SUPERVISOR` | `00000000-0000-4000-8000-000000000001` |
-| Mark | `FOREMAN` | `00000000-0000-4000-8000-000000000002` |
-| Henry | `FOREMAN` | `00000000-0000-4000-8000-000000000003` |
-
-| Task | Task ID | Assignee |
-| --- | --- | --- |
-| Pour foundation | `00000000-0000-4000-8000-000000000201` | Mark |
-| Build ground-floor walls | `00000000-0000-4000-8000-000000000202` | Mark |
-| Install electrical | `00000000-0000-4000-8000-000000000203` | Henry |
-
-The worksite "Three-storey townhouse" is `00000000-0000-4000-8000-000000000101`. Reports are not part of the example data.
-
-### Demo script in Swagger UI
-
-In Swagger UI, **Authorize** sets the `X-Actor-Id` and `X-Actor-Role` headers. Both must belong to the same user. To switch user, click **Logout** and authorize again. Every write needs an `Idempotency-Key`: type a new value for each action, for example `mark-save-1`.
-
-1. **Authorize as Mark.** `GET /worksites/{worksiteId}` shows the walls at 40%.
-2. **Save a draft.** `PUT /worksites/{worksiteId}/reports/{workDate}` with today's date and this body. Copy `id` and `version` from the response.
-
-   ```json
-   { "items": [ { "taskId": "00000000-0000-4000-8000-000000000202", "reportedProgress": 60 } ] }
-   ```
-
-3. **Submit.** `POST /reports/{reportId}/submit` with `{ "version": <version> }`. The walls are still at 40%.
-4. **Authorize as Linda and approve.** `POST /reports/{reportId}/approve` with the new `version`.
-5. **Check.** `GET /worksites/{worksiteId}` now shows the walls at 60%.
-
-Then show the guarantees:
-
-| Show | Do | Result |
-| --- | --- | --- |
-| Safe retry | Repeat step 2 with the same key and body | The same response is replayed. Nothing is written twice |
-| Reused key | Same key, change `reportedProgress` | `422 IDEMPOTENCY_KEY_REUSED` |
-| Stale write | Send a write with an old `version` | `409` conflict. The report is unchanged |
-| A rule | As Mark, save a new report for another date with the walls below their approved progress, then submit it | The save works, because a draft checks only the 0 to 100 range. The submit returns `422`, naming the task and its approved progress (BR-5) |
-| Permissions | Approve as Mark | `403` |
-
-The same flow, as the PRD's full 20 November example, is in [http/report-flow.http](http/report-flow.http) for an editor with an HTTP client.
+To walk through the PRD example request by request, open [http/report-flow.http](http/report-flow.http) in an editor with an HTTP client. It lists the user, worksite, and task IDs of the example data.
 
 ### Reset the data
 
@@ -215,111 +212,16 @@ Every start adds only the example rows that are missing and keeps existing data,
 | `X-Actor-Role` | Same as `X-Actor-Id` | `FOREMAN` or `SITE_SUPERVISOR`. It must match the user's role. |
 | `Idempotency-Key` | Every write | A new unique key per action (BR-14) |
 
-Writes to an existing report also send the report's current `version` in the body (BR-15). The request and response shapes are in the [OpenAPI description](http://localhost:3000/openapi.json).
+In Swagger UI, **Authorize** sets `X-Actor-Id` and `X-Actor-Role`. Writes to an existing report also send the report's current `version` in the body (BR-15). The request and response shapes are in the [OpenAPI description](http://localhost:3000/openapi.json).
 
 > **Talking points**
 >
 > - One command starts everything: database, migrations, example data, API.
-> - **Changing a percentage in a report does not change the task.** Only the approval in step 4 does. That is the product rule from part 1, working live.
+> - **Changing a percentage in a report does not change the task.** Only an approval does. That is the product rule from part 1, working live.
 > - The OpenAPI description is generated from the same Zod schemas that validate requests, and a test checks real responses against it. The documentation cannot drift from the code.
-> - Show one guarantee failing safely: a replayed request, or a `409` on a stale version.
+> - Failures are safe: a repeated request returns the stored response, and a write from a stale `version` gets `409`.
 
-## 4. Architecture and technology
-
-The application is a **modular monolith**: one codebase, one Docker image, one HTTP entry point. It is split into two modules, `worksite` and `reporting`, and each module has four layers taken from Domain-Driven Design.
-
-### Layers
-
-```
- interface/        Express routes · Zod request schemas · OpenAPI description
-        │
-        ▼
- application/      Use cases: one file = one business action
-        │
-        ▼
- domain/           Aggregates · Entities · Value objects · Repository ports
-        ▲          (plain TypeScript, no framework or database imports)
-        │
- infrastructure/   Prisma repositories · Mappers
-
- shared/           Concepts used by every module (actor, clock, errors),
-                   database client, configuration, HTTP middleware
-```
-
-- `domain` holds the business rules and imports nothing but other domain code. No Express, Prisma, or Zod.
-- `infrastructure` implements the repository interfaces (ports) that `domain` declares.
-- A module is imported only through its `index.ts`. `worksite` never imports `reporting`.
-- These rules are checked by dependency-cruiser on every commit, not just written down.
-
-### How a write request flows
-
-1. The request logger assigns a request ID.
-2. The actor middleware reads `X-Actor-Id` and `X-Actor-Role`, or responds `401`.
-3. The idempotency middleware replays the stored response if the key was already used.
-4. The route validates the input with Zod and calls exactly one use case.
-5. The use case loads aggregates, checks permissions, and calls domain methods, which enforce the rules.
-6. The repository writes, conditionally on `version`, in one transaction where needed.
-7. The error handler maps domain errors to HTTP responses with one error shape.
-
-### Key design decisions
-
-Each decision is recorded as an [ADR](docs/adr/), with its context and the alternatives considered.
-
-| ADR | Decision | Why |
-| --- | --- | --- |
-| [0001](docs/adr/0001-ddd-layers-inside-feature-modules.md) | DDD layers inside feature modules | Rules live in one place and are testable without a database |
-| [0002](docs/adr/0002-prisma-instead-of-query-builder-or-raw-sql.md) | Prisma instead of a query builder or raw SQL | Type-safe queries and versioned migrations. The hard part is concurrency, not complex queries |
-| [0003](docs/adr/0003-optimistic-locking-with-version-column.md) | Optimistic locking with a `version` column | Conflicts are rare, and users hold a report for minutes over mobile networks, so locks would be held too long |
-| [0004](docs/adr/0004-one-transaction-across-two-aggregates-on-approval.md) | One transaction across two aggregates on approval | DDD usually says one aggregate per transaction, but BR-9 requires all or nothing |
-
-### Technology
-
-| Concern | Choice | Why |
-| --- | --- | --- |
-| Runtime and language | Node.js 22 LTS, TypeScript 6 in `strict` mode | Long-term support, and types catch errors before tests do |
-| HTTP | Express 5 | Familiar and minimal. Version 5 handles errors thrown by async handlers |
-| Validation | Zod, at the HTTP boundary only | One schema validates input and produces the TypeScript type and the OpenAPI description |
-| Database | PostgreSQL 17 | Constraints, transactions, and time zones the rules depend on |
-| Data access | Prisma ORM 6 with Prisma Migrate | Generated types and reviewable migrations |
-| Logging | pino | Structured JSON, one line per request |
-| Tests | Jest, supertest, Testcontainers | Tests run against a real PostgreSQL in Docker |
-| Code quality | Biome, dependency-cruiser | Lint and format in one fast tool, and architecture rules as code |
-| Delivery | Docker, Docker Compose, GitHub Actions | One command to run, one pipeline to verify |
-
-Left out on purpose: CQRS, event sourcing, message queues, and a dependency injection container. Dependencies are wired by hand in `main.ts`.
-
-> **Talking points**
->
-> - **Modular monolith, not microservices.** Two modules with clear boundaries give most of the benefit without network calls or distributed transactions. A module could be split out later through its `index.ts`.
-> - **The domain is pure TypeScript.** Business rules can be read and tested without Express or a database.
-> - **ADR 0004 is a deliberate trade-off:** it breaks a common DDD guideline because a business rule (BR-9) demands it, and the ADR records why.
-> - **Optimistic locking** (ADR 0003) is what makes "no silent overwrites" work without holding database locks.
-> - Every technology choice has one reason. Nothing is there for its own sake.
-
-## 5. Coding standard
-
-The [coding standard](docs/engineering/coding-standard.md) is a list of rules, each with an ID, a level (`MUST` or `SHOULD`), and how it is checked. Most `MUST` rules are checked by a tool, so a review can focus on design instead of style.
-
-| Area | Example rules | Checked by |
-| --- | --- | --- |
-| TypeScript (TS) | `strict` mode, no `any`, no `@ts-ignore`, no non-null `!`, every union `switch` is exhaustive | `tsc`, Biome |
-| Naming (NAM) | `kebab-case` files. Domain names spelled as in the glossary. A use case file is named after its action: `approve-report.ts` | Biome, review |
-| Architecture (ARC) | Layer and module import rules. Rules live in `domain` and cite their ID. One use case per file. Time comes from `Clock`, never `new Date()` | dependency-cruiser, Biome plugin, review |
-| Errors (ERR) | Domain errors carry a code and know nothing about HTTP. One place maps them to responses | Review |
-| Database (DB) | Uniqueness by database constraint, never check-then-insert. Every report write is conditional on `version`. Multi-row changes use one transaction | dependency-cruiser, review |
-| API | Every input validated with Zod. Every write requires an `Idempotency-Key`. Every endpoint described in OpenAPI | `openapi.api.test.ts`, review |
-| Logging and config (LOG, CFG) | Shared pino logger, no `console.log`. `process.env` read only in `config.ts` | Biome |
-| Git (GIT) | Conventional Commits. One logical change per commit. Behavior changes include their tests | CI, review |
-
-`npm run check` runs every automatic check locally: typecheck, Biome, dependency-cruiser, and unit tests.
-
-> **Talking points**
->
-> - **Rules have IDs, like business rules.** A review comment can say "ARC-07" instead of a paragraph.
-> - **Enforced, not just written.** Custom Biome plugins (GritQL) block `new Date()` in the domain and unsafe type assertions, and dependency-cruiser fails the build on a wrong import.
-> - Constraints in the database, not in application code (DB-02), mean a race condition cannot create a duplicate.
-
-## 6. Testing
+## 5. Testing
 
 The [testing guide](docs/engineering/testing.md) defines three layers. Each one proves something the others cannot.
 
@@ -348,7 +250,7 @@ npm run test:all     # unit, integration, and API tests, Docker required
 > - **Rule-ID test names** make coverage of the requirements visible: `grep "it(\"BR-9"` lists the tests that prove atomic approval.
 > - Concurrency tests start both operations together and assert that exactly one wins, without assuming which.
 
-## 7. CI and security
+## 6. CI and security
 
 One GitHub Actions workflow, [ci.yml](.github/workflows/ci.yml), runs on every push and pull request. Every step must pass.
 
@@ -378,7 +280,7 @@ One GitHub Actions workflow, [ci.yml](.github/workflows/ci.yml), runs on every p
 > - **Supply chain:** actions pinned to commit SHAs, a read-only token, and weekly Dependabot updates.
 > - **Two different scans:** `npm audit` checks the libraries we chose, and Trivy checks everything in the shipped image, including the OS. Trivy found vulnerabilities in the npm CLI bundled with the Node.js base image, so the runtime image now removes npm.
 
-## 8. Developer guide and contributing
+## 7. Developer guide and contributing
 
 ### Set up
 
@@ -415,18 +317,6 @@ Read from the environment through [src/config.ts](src/config.ts). Defaults for l
 | `LOG_LEVEL` | pino log level |
 | `DB_PORT` | Host port of the `db` service in Docker Compose |
 
-### Repository layout
-
-| Path | Contents |
-| --- | --- |
-| `src/modules/` | The `worksite` and `reporting` modules, each with `domain`, `application`, `infrastructure`, `interface` |
-| `src/shared/` | Code used by every module |
-| `test/` | Unit, integration, and API tests, fakes, and test data builders |
-| `prisma/` | Schema, migrations, example data |
-| `specs/` | One folder per feature: spec, plan, data model, contracts, tasks |
-| `docs/` | Product, engineering, and decision documents |
-| `http/` | Manual walkthrough requests |
-
 ### How a feature is built
 
 The [workflow](docs/engineering/workflow.md) is spec-first, using [Spec-Kit](https://github.com/github/spec-kit) with an AI coding agent. Three principles:
@@ -461,7 +351,7 @@ Four features were built this way, in `specs/001` to `specs/004`.
 > - **Spec-first with AI:** the agent drafts specs, plans, and code, but every step has a human approval and an automated check. `AGENTS.md` makes the rules explicit for the agent, for example "never weaken a failing test" and "never resolve a conflict with the documents silently".
 > - Every feature leaves a trail: spec → plan → tasks → commits, all citing the same rule IDs.
 
-## 9. Simplifications and next steps
+## 8. Simplifications and next steps
 
 This model is deliberately smaller than a real construction workflow.
 
