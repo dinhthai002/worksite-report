@@ -180,6 +180,8 @@ No task list or code is written until the plan is approved.
 > - **Tables are designed when first needed.** Step 2 adds the report tables, and steps 3 and 4 add none.
 > - Every step shares the same exit criteria: `npm run check` and `npm run test:all` pass, every rule has a test named after its ID, and `docker compose up` still works.
 > - Step 5 is not built yet, so worksites and tasks come from the example data.
+> - **Spec-driven with AI:** the agent drafts specs, plans, and code, but every step has a human approval and an automated check. `AGENTS.md` makes the rules explicit for the agent, for example "never weaken a failing test" and "never resolve a conflict with the documents silently".
+> - Every feature leaves a trail: spec → plan → tasks → commits, all citing the same rule IDs.
 
 ## 4. See it running
 
@@ -202,11 +204,13 @@ This starts PostgreSQL, applies migrations, loads the example data, and starts t
 
 To walk through the PRD example request by request, open [http/report-flow.http](http/report-flow.http) in an editor with an HTTP client. It lists the user, worksite, and task IDs of the example data.
 
+For a live demo from a terminal, open [http/api-demo.html](http/api-demo.html) in a browser. It lists copy-ready `curl` commands for the main flow, with reject and resubmit and the guarantees on request. It needs `curl` and `jq`.
+
 ### Reset the data
 
 | Goal | Command |
 | --- | --- |
-| Restore the example to its PRD values, keeping nothing else | `npx prisma db seed` (or `docker compose run --rm migrate node dist/prisma/seed.js --reset` without Node.js on the host) |
+| Put the example's users, worksite, and tasks back to their PRD values. Reports are kept | `npx prisma db seed` (or `docker compose run --rm migrate node dist/prisma/seed.js --reset` without Node.js on the host) |
 | Remove all data, including reports | `docker compose down -v`, then start again |
 
 Every start adds only the example rows that are missing and keeps existing data, so progress you change survives a restart.
@@ -333,24 +337,6 @@ Read from the environment through [src/config.ts](src/config.ts). Defaults for l
 | `LOG_LEVEL` | pino log level |
 | `DB_PORT` | Host port of the `db` service in Docker Compose |
 
-### How a feature is built
-
-The [workflow](docs/engineering/workflow.md) follows spec-driven development (SDD): the specification is written and approved first, and the code is derived from it. Specs are drafted with [Spec-Kit](https://github.com/github/spec-kit) and an AI coding agent. Three principles:
-
-1. **The documents come first.** Behavior is defined in `docs/product/` before any code. When code and documents disagree, the disagreement is resolved explicitly, never silently.
-2. **The human decides, the agent drafts.** A person reads and approves every spec, plan, and change before the next step starts.
-3. **Checks are automated.** A step is done when its check passes, not when someone says so.
-
-| Step | Output | Done when |
-| --- | --- | --- |
-| Specify and clarify | `specs/NNN-name/spec.md`, citing use case and rule IDs | No open questions left |
-| Plan | `plan.md`, `data-model.md`, `contracts/` | The plan follows the architecture rules |
-| Tasks and analyze | `tasks.md`, each task citing its rules | Every rule has a task and a test |
-| Implement | Code and tests: domain, then use case, then repository, then route | `npm run check` passes |
-| Verify and commit | Small commits | `npm run test:all` and CI pass |
-
-Four features were built this way, in `specs/001` to `specs/004`.
-
 ### Contributing
 
 - Start from a spec in `specs/NNN-name/` for any change in behavior.
@@ -364,8 +350,6 @@ Four features were built this way, in `specs/001` to `specs/004`.
 > **Talking points**
 >
 > - A new developer runs five commands, and `npm run check` tells them whether their change is acceptable.
-> - **Spec-first with AI:** the agent drafts specs, plans, and code, but every step has a human approval and an automated check. `AGENTS.md` makes the rules explicit for the agent, for example "never weaken a failing test" and "never resolve a conflict with the documents silently".
-> - Every feature leaves a trail: spec → plan → tasks → commits, all citing the same rule IDs.
 
 ## 8. Simplifications and next steps
 
