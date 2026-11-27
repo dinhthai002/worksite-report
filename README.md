@@ -127,16 +127,6 @@ Each module follows **Domain-Driven Design (DDD)**. The business is modeled with
 - A module is imported only through its `index.ts`. `worksite` never imports `reporting`.
 - These rules are checked by dependency-cruiser on every commit, not just written down.
 
-### How a write request flows
-
-1. The request logger assigns a request ID.
-2. The actor middleware reads `X-Actor-Id` and `X-Actor-Role`, or responds `401`.
-3. The idempotency middleware replays the stored response if the key was already used.
-4. The route validates the input with Zod and calls exactly one use case.
-5. The use case loads aggregates, checks permissions, and calls domain methods, which enforce the rules.
-6. The repository writes, conditionally on `version`, in one transaction where needed.
-7. The error handler maps domain errors to HTTP responses with one error shape.
-
 > **Talking points**
 >
 > - Every technology choice has one reason. Nothing is there for its own sake.
@@ -157,6 +147,26 @@ The PRD is built in five steps, one Spec-Kit feature each. Every step delivers o
 | 5 | `005-worksite-management` | Create a worksite, add tasks, assign foremen | BR-13 | Not started |
 
 Each step follows the [workflow](docs/engineering/workflow.md): specify, clarify, plan, tasks, implement. A person approves the output of every step before the next one starts. Inside a step, code is built from the inside out: domain, then use cases, then repositories, then routes, each with its tests.
+
+### Spec-driven development
+
+```mermaid
+flowchart TD
+    D["Ticket, PRD, or<br/>implementation plan step"] --> S["Specify<br/>/speckit-specify → spec.md"]
+    S --> C["Clarify<br/>/speckit-clarify"]
+    C --> P["Plan<br/>/speckit-plan → plan.md, data-model.md, contracts/"]
+    C -.->|"open questions"| Q["Answer and<br/>update the spec"]
+    Q -.->|"repeat until none are left"| C
+    P --> R{"Review the plan"}
+    R -- "changes" --> P
+    R -- "approved" --> T["Tasks<br/>/speckit-tasks → tasks.md"]
+    T --> A["Analyze<br/>/speckit-analyze"]
+    A --> I["Implement<br/>/speckit-implement<br/>domain → use case → repository → route"]
+    I --> V["Verify<br/>npm run check, npm run test:all"]
+    V --> CI["CI"]
+```
+
+No task list or code is written until the plan is approved.
 
 > **Talking points**
 >
@@ -319,7 +329,7 @@ Read from the environment through [src/config.ts](src/config.ts). Defaults for l
 
 ### How a feature is built
 
-The [workflow](docs/engineering/workflow.md) is spec-first, using [Spec-Kit](https://github.com/github/spec-kit) with an AI coding agent. Three principles:
+The [workflow](docs/engineering/workflow.md) follows spec-driven development (SDD): the specification is written and approved first, and the code is derived from it. Specs are drafted with [Spec-Kit](https://github.com/github/spec-kit) and an AI coding agent. Three principles:
 
 1. **The documents come first.** Behavior is defined in `docs/product/` before any code. When code and documents disagree, the disagreement is resolved explicitly, never silently.
 2. **The human decides, the agent drafts.** A person reads and approves every spec, plan, and change before the next step starts.
