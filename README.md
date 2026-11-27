@@ -101,9 +101,15 @@ Left out on purpose: CQRS, event sourcing, message queues, and a dependency inje
 
 The rules for writing code are in the [coding standard](docs/engineering/coding-standard.md).
 
-### Layers
+### Domain-Driven Design
 
-Each module follows **Domain-Driven Design (DDD)**. The business is modeled with DDD's building blocks: aggregates such as `DailyReport`, entities, value objects, and repositories. The code is split into four layers around that model, with the domain at the center.
+Each module follows **Domain-Driven Design (DDD)**:
+
+- **Rules live in one place:** the domain, not routes or queries.
+- **Easy to test:** the domain is plain TypeScript, so rules are tested without a database.
+- **Code speaks the business language:** `DailyReport` and other glossary terms appear in the spec, the code, and the tests.
+
+The code is split into four layers, with the domain at the center.
 
 ```
  interface/        Express routes · Zod request schemas · OpenAPI description
