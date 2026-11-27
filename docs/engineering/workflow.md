@@ -3,6 +3,21 @@
 - Scope: how a change goes from requirement to merged code in this repository, using Spec-Kit with an AI coding agent.
 - Related documents: [PRD](../product/prd.md), [Use cases and business rules](../product/use-cases.md), [Architecture](./architecture.md), [Coding standard](./coding-standard.md), [Testing](./testing.md).
 
+## Spec-driven development
+
+This repository follows spec-driven development (SDD). The specification is the main artifact, and code is derived from it. A change in behavior starts as a change to the specification, and the code follows. In code-first work, by contrast, the specification is written after the code, if at all.
+
+The specification has two levels:
+
+| Level | Where | What it holds | Changes when |
+| --- | --- | --- | --- |
+| Product | `docs/product/`: PRD, use cases, business rules with IDs | What the product does and the rules it enforces | The product owner decides a change in behavior |
+| Feature | `specs/NNN-name/`: spec, plan, data model, contracts, tasks | How one feature applies the product rules, designed before it is built | A feature is built, following the steps in section 3 |
+
+Rule and use case IDs tie the levels together. A rule such as BR-5 is defined in the use cases, cited in the feature spec and its tasks, implemented once in the domain with a `// BR-5` comment, and proved by tests whose names start with `BR-5`. Each step can be checked against the one before it.
+
+Specs are drafted with [Spec-Kit](https://github.com/github/spec-kit) and an AI coding agent. The agent writes the drafts, and a person approves each one before the next step starts (section 1).
+
 ## 1. Principles
 
 1. **The documents come first.** Behavior is defined in `docs/product/` before any code is written. Code that disagrees with the documents is a bug in one of them, and the disagreement is resolved explicitly.
